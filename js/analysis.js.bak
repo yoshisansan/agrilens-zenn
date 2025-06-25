@@ -1,0 +1,402 @@
+// 分析データの取得（サーバーサイドAPIを使用）
+async function fetchGEEAnalysis(aoiGeoJSON) {
+    console.log("Sending AOI to server:", aoiGeoJSON);
+    showProcessingModal("圃場分析を処理中", "Google Earth Engineに接続しています...");
+    
+    // 実際の処理状況を反映するプログレスバー（初期値）
+    updateProgressBar(10);
+
+    try {
+        // GeoJSONデータの検証
+        if (!aoiGeoJSON) {
+            hideProcessingModal(); // 処理中モーダルを明示的に閉じる
+            throw new Error("GeoJSONデータがありません");
+        }
+        
+        // GeoJSONのFeatureからジオメトリを抽出
+        let geometryData = aoiGeoJSON;
+        
+        // Featureの場合、ジオメトリを抽出
+        if (aoiGeoJSON.type === 'Feature' && aoiGeoJSON.geometry) {
+            geometryData = aoiGeoJSON.geometry;
+            console.log('Featureからジオメトリを抽出:', geometryData.type);
+        }
+        
+        // 座標データの確認
+        if (!geometryData.coordinates || !Array.isArray(geometryData.coordinates)) {
+            console.error('無効な座標データ:', geometryData);
+            hideProcessingModal(); // 処理中モーダルを明示的に閉じる
+            throw new Error("座標データがないか無効です");
+        }
+        
+        console.log('GEEに送信するジオメトリデータ:', JSON.stringify(geometryData));
+        updateProgressBar(20);
+        showProcessingModal("圃場分析を処理中", "GEEで衛星画像を検索中...");
+
+        // リクエストの作成と送信
+        const requestBody = { aoiGeoJSON: geometryData };
+        console.log('送信リクエスト:', JSON.stringify(requestBody));
+        updateProgressBar(30);
+
+        const response = await fetch('/api/analyze', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        updateProgressBar(70);
+        showProcessingModal("圃場分析を処理中", "GEEからのデータを処理中...");
+
+        // ステータスコードとレスポンスデータを取得
+        const responseData = await response.json();
+        console.log('GEEからのレスポンス:', responseData);
+        updateProgressBar(90);
+
+        if (!response.ok) {
+            hideProcessingModal(); // 処理中モーダルを明示的に閉じる
+            
+            if (response.status === 401) {
+                // 認証が必要な場合、認証ページにリダイレクト
+                window.location.href = '/auth';
+                return;
+            }
+            
+            // サーバーから返されたエラーメッセージを表示
+            const errorMessage = responseData.error || `HTTP error! status: ${response.status}`;
+            const errorDetails = responseData.details || '';
+            
+            showToast("エラーが発生しました", `${errorMessage}\n${errorDetails}`);
+            throw new Error(errorMessage);
+        }
+
+        updateProgressBar(100);
+        hideProcessingModal(); // 処理完了時にモーダルを明示的に閉じる
+        return responseData;
+
+    } catch (error) {
+        console.error('GEE分析中にエラーが発生しました:', error);
+        hideProcessingModal(); // エラー時にモーダルを明示的に閉じる
+        
+        // 認証エラーメッセージの場合
+        if (error.message && (
+            error.message.includes('authentication credential') || 
+            error.message.includes('OAuth') ||
+            error.message.includes('Earth Engine')
+        )) {
+            showToast("認証エラー", "Google Earth Engineへの認証に失敗しました。モックデータを使用します。");
+            // モックデータを返す
+            console.log("[DEBUG] 認証エラー - モックデータを返します");
+            return createLocalMockData(aoiGeoJSON);
+        }
+        showToast("エラーが発生しました", `GEE分析中にエラーが発生しました: ${error.message}`);
+        throw error;
+    }
+}
+
+// GEEからの統計データを整形する関数
+function processIndicesStats(rawStats) {
+    const processed = {
+        ndvi: {},
+        ndmi: {},
+        ndre: {}
+    };
+
+    if (rawStats) {
+        for (const key in rawStats) {
+            if (rawStats.hasOwnProperty(key)) {
+                const parts = key.split('_'); // 例: "NDVI_mean" -> ["NDVI", "mean"]
+                if (parts.length === 2) {
+                    const indexName = parts[0].toLowerCase(); // "ndvi", "ndmi", "ndre"
+                    const statName = parts[1]; // "mean", "min", "max", "stdDev"
+                    
+                    if (processed.hasOwnProperty(indexName)) {
+                        // GEEのキー (e.g., NDVI_stdDev) に合わせて小文字のstatNameをそのまま使う
+                        processed[indexName][statName] = rawStats[key];
+                    }
+                }
+            }
+        }
+    }
+    console.log("Processed stats:", processed); // デバッグ用ログ
+    return processed;
+}
+
+// 分析結果の表示
+function displayAnalysisResults(data) {
+    console.log("GEEから受信した分析データ:", data);
+
+    // 各植生指標レイヤーの追加
+    // addVegetationIndicesLayers(data); // 問題の関数呼び出しを一旦コメントアウト
+    console.log("渡されている data の内容:", JSON.stringify(data, null, 2)); // dataの内容確認用ログ
+
+    // 統計データの取得と整形
+    const stats = processIndicesStats(data.stats);
+
+    // 詳細な統計データのログ出力
+    console.log('GEE分析統計データ:', {
+        植生指標: {
+            NDVI: {
+                平均: stats.ndvi.mean,
+                標準偏差: stats.ndvi.stdDev,
+                最小: stats.ndvi.min,
+                最大: stats.ndvi.max
+            },
+            NDMI: {
+                平均: stats.ndmi.mean,
+                標準偏差: stats.ndmi.stdDev,
+                最小: stats.ndmi.min,
+                最大: stats.ndmi.max
+            },
+            NDRE: {
+                平均: stats.ndre.mean,
+                標準偏差: stats.ndre.stdDev,
+                最小: stats.ndre.min,
+                最大: stats.ndre.max
+            }
+        },
+        日付範囲: data.dateRange
+    });
+
+    // 健康状態の総合評価
+    const evaluation = evaluateFieldHealth(stats);
+    
+    // サマリーの更新
+    updateHealthSummary(evaluation, stats);
+    
+    // AIによる基本的な診断コメント
+    updateAiComment(evaluation, stats);
+    
+    // 詳細統計の更新
+    updateDetailedStats(stats, data.dateRange);
+    
+    // 分析結果パネルの表示（2回目以降も確実に表示されるようにする）
+    if (analysisResultsEl) {
+        // 一度非表示にしてから表示することで、DOMの更新を確実にする
+        analysisResultsEl.classList.add('hidden');
+        // 少し遅延させて確実に表示する
+        setTimeout(() => {
+            analysisResultsEl.classList.remove('hidden');
+        }, 50);
+    }
+    
+    // 生成時刻を更新
+    const timeEl = document.getElementById('analysisGeneratedTime');
+    if (timeEl) {
+        timeEl.textContent = `生成時刻: ${new Date().toLocaleString()}`;
+    }
+    
+    // タイルURLが無い場合のメッセージ表示
+    if (!data.ndviTileUrlTemplate && !data.ndmiTileUrlTemplate && !data.ndreTileUrlTemplate) {
+        showToast("注意", "マップ表示用の植生指標レイヤーを生成できませんでしたが、統計データは分析できました。");
+    } else {
+    // 完了メッセージの表示
+        showToast("分析完了", `植生指標分析が完了しました。NDVI: ${stats.ndvi.mean}、NDMI: ${stats.ndmi.mean}、NDRE: ${stats.ndre.mean}`);
+    }
+    
+    // AIアドバイスタブの初期準備 (Gemini API連携)
+    prepareAiAdviceTab();
+
+    // 分析完了イベントを発火（Gemini APIコール用）
+    const analysisCompletedEvent = new CustomEvent('analysisCompleted', { 
+        detail: { 
+            dateRange: data.dateRange,
+            stats: stats
+        }
+    });
+    document.dispatchEvent(analysisCompletedEvent);
+
+    // AIアドバイス取得処理
+    const fieldData = getCurrentFieldDataForAnalysis(); // 現在の圃場データを取得する関数（別途定義または既存のものを利用）
+    if (fieldData) {
+        getGeminiAdvice(stats, fieldData).then(advice => {
+            const aiRecommendations = document.getElementById('aiRecommendations');
+            if (aiRecommendations) {
+                if (advice && !advice.error) {
+                    // JSONレスポンスを整形して表示（例：重要な知見のまとめのみ表示）
+                    let adviceContent = '<h3 class="text-lg font-semibold mb-2">AIによる詳細アドバイス</h3>';
+                    if (advice.重要な知見のまとめ) {
+                        adviceContent += `<p class="mb-2"><strong>重要な知見のまとめ:</strong> ${advice.重要な知見のまとめ}</p>`;
+                    }
+                    // 必要に応じて他の情報も表示
+                    // adviceContent += ...
+                    aiRecommendations.innerHTML = adviceContent;
+                } else {
+                    aiRecommendations.innerHTML = `<p class="text-red-500">AIアドバイスの取得に失敗しました。${advice && advice.message ? advice.message : ''}</p>`;
+                }
+            } else {
+                console.error('aiRecommendations element not found');
+            }
+        }).catch(error => {
+            console.error('Error fetching Gemini advice:', error);
+            const aiRecommendations = document.getElementById('aiRecommendations');
+            if (aiRecommendations) {
+                aiRecommendations.innerHTML = '<p class="text-red-500">AIアドバイスの取得中にエラーが発生しました。</p>';
+            }
+        });
+    } else {
+        console.warn('AIアドバイス取得のための圃場データがありません。');
+        const aiRecommendations = document.getElementById('aiRecommendations');
+        if (aiRecommendations) {
+            aiRecommendations.innerHTML = '<p class="text-yellow-500">AIアドバイスを生成するための圃場情報が選択されていません。</p>';
+        }
+    }
+
+    // グローバル変数に最新の分析データを保存
+    window.latestAnalysisData = {
+        dateRange: data.dateRange,
+        stats: stats
+    };
+}
+
+// AIアドバイスタブを初期表示用に準備
+function prepareAiAdviceTab() {
+    const aiRecommendations = document.getElementById('aiRecommendations');
+
+    // Gemini APIキーが環境変数に設定されているか確認
+    const hasApiKey = window.ENV && window.ENV.GEMINI_API_KEY;
+
+    // メインのAIコメント領域にローディング表示
+    if (aiRecommendations) {
+        // すでに内容がある場合は上書きしない
+        if (aiRecommendations.textContent.includes('分析結果を読み込み中') || aiRecommendations.innerHTML.includes('animate-spin')) {
+            aiRecommendations.innerHTML = `
+            <div class="flex justify-center items-center py-6">
+                <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mr-3"></div>
+                <p class="text-gray-600 text-lg">AIアドバイスを生成中...</p>
+            </div>`;
+        }
+    }
+
+    // APIキーがない場合の警告表示
+    if (!hasApiKey && aiRecommendations) {
+        aiRecommendations.innerHTML = `
+        <div class="text-center p-6 bg-yellow-50 rounded-lg border border-yellow-200">
+            <div class="text-yellow-600 mb-3"><i class="fas fa-exclamation-triangle text-3xl"></i></div>
+            <h4 class="font-medium mb-2 text-lg">Gemini APIキーが設定されていません</h4>
+            <p class="mb-3">詳細な作物分析アドバイスを受け取るには、サーバー側の環境変数に Gemini APIキーを設定してください。</p>
+        </div>`;
+    }
+}
+
+// AIアドバイス取得のために、現在の圃場データを取得する仮の関数
+// 必要に応じて、実際の圃場データ管理モジュールから取得するように修正してください。
+function getCurrentFieldDataForAnalysis() {
+    // fields.js や map.js などで管理されている現在の圃場IDを取得する想定
+    const currentFieldId = window.currentFieldId; // 例: グローバル変数から取得
+    if (!currentFieldId) {
+        console.warn('No current field ID found for AI advice.');
+        return null;
+    }
+
+    // ローカルストレージなどから圃場リストを取得する想定
+    const savedFields = JSON.parse(localStorage.getItem('savedFields')) || [];
+    const field = savedFields.find(f => f.id === currentFieldId);
+
+    if (field) {
+        return {
+            name: field.name,
+            latitude: field.latlng ? field.latlng.lat : null, // 構造に合わせて調整
+            longitude: field.latlng ? field.latlng.lng : null, // 構造に合わせて調整
+            crop: field.cropType, // 構造に合わせて調整
+            region: field.region // 構造に合わせて調整
+            // その他、gemini-api.js のプロンプトに必要な情報があれば追加
+        };
+    }
+    console.warn(`Field data not found for ID: ${currentFieldId}`);
+    return null;
+}
+
+// 総合的な圃場健康状態の評価
+function evaluateFieldHealth(stats) {
+    // NDVIの評価
+    const ndviStatus = evaluateNdviStatus(stats.ndvi.mean);
+    
+    // NDMIの評価
+    const ndmiStatus = evaluateNdmiStatus(stats.ndmi.mean);
+    
+    // NDREの評価
+    const ndreStatus = evaluateNdreStatus(stats.ndre.mean);
+    
+    // 総合評価
+    let overallStatus = { status: '不明', class: 'bg-gray-100 text-gray-800' };
+    
+    // 全てのデータが有効な場合のみ総合評価
+    if (ndviStatus.status !== '不明' && ndmiStatus.status !== '不明' && ndreStatus.status !== '不明') {
+        const statusValues = [
+            getStatusValue(ndviStatus.status),
+            getStatusValue(ndmiStatus.status),
+            getStatusValue(ndreStatus.status)
+        ];
+        
+        const avgStatus = statusValues.reduce((sum, val) => sum + val, 0) / statusValues.length;
+        
+        if (avgStatus >= 2.5) {
+            overallStatus = { status: '良好', class: 'bg-green-100 text-green-800' };
+        } else if (avgStatus >= 1.5) {
+            overallStatus = { status: '普通', class: 'bg-yellow-100 text-yellow-800' };
+        } else {
+            overallStatus = { status: '要注意', class: 'bg-red-100 text-red-800' };
+        }
+    }
+    
+    return {
+        overall: overallStatus,
+        ndvi: ndviStatus,
+        ndmi: ndmiStatus,
+        ndre: ndreStatus
+    };
+}
+
+// ステータスの数値化
+function getStatusValue(status) {
+    switch (status) {
+        case '良好': return 3;
+        case '普通': return 2;
+        case '要注意': return 1;
+        default: return 0;
+    }
+}
+
+// NDVI値の評価
+function evaluateNdviStatus(avgNdvi) {
+    if (avgNdvi === '-') return { status: '不明', class: 'bg-gray-100 text-gray-800' };
+    
+    const avgVal = parseFloat(avgNdvi);
+    if (avgVal > CONFIG.NDVI.GOOD) {
+        return { status: '良好', class: 'bg-green-100 text-green-800' };
+    } else if (avgVal > CONFIG.NDVI.MODERATE) {
+        return { status: '普通', class: 'bg-yellow-100 text-yellow-800' };
+    } else {
+        return { status: '要注意', class: 'bg-red-100 text-red-800' };
+    }
+}
+
+// NDMI値の評価
+function evaluateNdmiStatus(avgNdmi) {
+    if (avgNdmi === '-') return { status: '不明', class: 'bg-gray-100 text-gray-800' };
+    
+    const avgVal = parseFloat(avgNdmi);
+    if (avgVal > CONFIG.NDMI.GOOD) {
+        return { status: '良好', class: 'bg-green-100 text-green-800' };
+    } else if (avgVal > CONFIG.NDMI.MODERATE) {
+        return { status: '普通', class: 'bg-yellow-100 text-yellow-800' };
+    } else {
+        return { status: '要注意', class: 'bg-red-100 text-red-800' };
+    }
+}
+
+// NDRE値の評価
+function evaluateNdreStatus(avgNdre) {
+    if (avgNdre === '-') return { status: '不明', class: 'bg-gray-100 text-gray-800' };
+    
+    const avgVal = parseFloat(avgNdre);
+    if (avgVal > CONFIG.NDRE.GOOD) {
+        return { status: '良好', class: 'bg-green-100 text-green-800' };
+    } else if (avgVal > CONFIG.NDRE.MODERATE) {
+        return { status: '普通', class: 'bg-yellow-100 text-yellow-800' };
+    } else {
+        return { status: '要注意', class: 'bg-red-100 text-red-800' };
+    }
+}

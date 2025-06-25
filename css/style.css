@@ -1,0 +1,79 @@
+/* 既存のスタイルに追加するCSSルール */
+
+/* ディレクトリ名編集のスタイル */
+.directory-name {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+/* 編集アイコンの関連スタイルは削除しました */
+
+/* すべてのリスト名のホバースタイル */
+.directory-name:hover {
+    background-color: rgba(219, 234, 254, 0.8);
+    color: #1e40af;
+    cursor: text;
+}
+
+/* 編集時の入力フィールドスタイル */
+.directory-name-edit {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    width: 100%;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+/* フォーカス時のスタイル */
+input.directory-name-edit:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+/* 作物名表示のスタイル */
+.crop-name {
+    font-size: 0.75rem;
+    color: #4b5563;
+    margin-left: 0.5rem;
+    font-style: italic;
+}
+
+/* 作物名入力フィールドのスタイル */
+.edit-directory-crop-input {
+    width: 100%;
+    outline: none;
+    font-size: 0.875rem;
+}
+
+/* 区画インライン編集フォームのスタイル */
+.field-edit-form {
+    background-color: rgba(249, 250, 251, 0.95);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s ease;
+}
+
+/* 区画編集入力フィールドのスタイル */
+.edit-field-name-input,
+.edit-field-memo-input,
+.edit-field-crop-input,
+.edit-field-directory-select {
+    width: 100%;
+    font-size: 0.875rem;
+    transition: border-color 0.2s ease;
+}
+
+/* フォーカス時のスタイル */
+.edit-field-name-input:focus,
+.edit-field-memo-input:focus,
+.edit-field-crop-input:focus,
+.edit-field-directory-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+} 
