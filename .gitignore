@@ -1,5 +1,5 @@
 .env
-!.env.sample
+!.env.example
 service_credential.json
 node_modules/
 .next/
