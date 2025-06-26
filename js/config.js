@@ -97,5 +97,28 @@ const CONFIG = {
         MAX_DIRECTORIES: 10, // ユーザーあたりの最大リスト数
         STORAGE_KEY: 'hatake_health_directories', // ローカルストレージのキー
         DEFAULT_NAME: '圃場1' // デフォルトリスト名
+    },
+    
+    // APIとタイムアウト設定
+    API: {
+        GEMINI_TIMEOUT: 30000, // Gemini APIタイムアウト（ms）
+        RETRY_COUNT: 3, // リトライ回数
+        RETRY_DELAY: 1000 // リトライ間隔（ms）
+    },
+    
+    // UI設定
+    UI: {
+        PANEL_ANIMATION_DELAY: 50, // パネル表示遅延（ms）
+        PROGRESS_UPDATE_DELAY: 100, // プログレスバー更新間隔（ms）
+        LOADING_SPINNER_DELAY: 200, // ローディング表示遅延（ms）
+        DEFAULT_DECIMAL_PLACES: 3 // デフォルト小数点以下桁数
+    },
+    
+    // デフォルト値設定
+    DEFAULTS: {
+        NDVI_VALUE: 0.65,
+        NDMI_VALUE: 0.42,
+        NDRE_VALUE: 0.38,
+        CROP_TYPE: '不明'
     }
 }; 
