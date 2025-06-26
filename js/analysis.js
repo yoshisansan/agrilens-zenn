@@ -362,7 +362,14 @@ function displayAdviceUI(advice) {
     if (advice && !advice.error) {
         aiRecommendations.innerHTML = buildAdviceHTML(advice);
     } else {
-        aiRecommendations.innerHTML = `<p class=\"text-red-500\">AIアドバイスの取得に失敗しました。${advice && advice.message ? advice.message : ''}</p>`;
+        // エラー時のメッセージを改善
+        const errorMessage = advice && advice.message ? advice.message : 'AIアドバイスの取得に失敗しました。';
+        aiRecommendations.innerHTML = `
+        <div class="text-center p-6 bg-red-50 rounded-lg border border-red-200">
+            <div class="text-red-600 mb-3"><i class="fas fa-exclamation-circle text-3xl"></i></div>
+            <h4 class="font-medium mb-2 text-lg">AIアドバイス取得エラー</h4>
+            <p class="text-sm text-gray-700">${errorMessage}</p>
+        </div>`;
     }
 }
 
@@ -595,10 +602,38 @@ function handleAdviceError(error) {
     console.error('Error fetching Gemini advice:', error);
     const aiRecommendations = document.getElementById('aiRecommendations');
     if (aiRecommendations) {
-        if (error.message) {
-            aiRecommendations.innerHTML = '<p class=\"text-red-500\">AIアドバイスの呼び出しエラー: ' + error.message + '</p>';
+        // APIキー関連のエラーかチェック
+        if (error.message && (
+            error.message.includes('APIキー') || 
+            error.message.includes('API key') ||
+            error.message.includes('設定されていません') ||
+            error.message.includes('authentication')
+        )) {
+            // APIキー設定エラーの場合の表示
+            aiRecommendations.innerHTML = `
+            <div class="text-center p-6 bg-yellow-50 rounded-lg border border-yellow-200">
+                <div class="text-yellow-600 mb-3"><i class="fas fa-exclamation-triangle text-3xl"></i></div>
+                <h4 class="font-medium mb-2 text-lg">Gemini APIキーが設定されていません</h4>
+                <p class="mb-3">詳細な作物分析アドバイスを受け取るには、サーバー側の環境変数に Gemini APIキーを設定してください。</p>
+                <p class="text-sm text-gray-600">エラー詳細: ${error.message}</p>
+            </div>`;
         } else {
-            aiRecommendations.innerHTML = '<p class=\"text-red-500\">AIアドバイスの取得中にエラーが発生しました。</p>';
+            // その他のエラーの場合
+            if (error.message) {
+                aiRecommendations.innerHTML = `
+                <div class="text-center p-6 bg-red-50 rounded-lg border border-red-200">
+                    <div class="text-red-600 mb-3"><i class="fas fa-exclamation-circle text-3xl"></i></div>
+                    <h4 class="font-medium mb-2 text-lg">AIアドバイス取得エラー</h4>
+                    <p class="text-sm text-gray-700">エラー: ${error.message}</p>
+                </div>`;
+            } else {
+                aiRecommendations.innerHTML = `
+                <div class="text-center p-6 bg-red-50 rounded-lg border border-red-200">
+                    <div class="text-red-600 mb-3"><i class="fas fa-exclamation-circle text-3xl"></i></div>
+                    <h4 class="font-medium mb-2 text-lg">AIアドバイス取得エラー</h4>
+                    <p class="text-sm text-gray-700">AIアドバイスの取得中にエラーが発生しました。しばらくしてからもう一度お試しください。</p>
+                </div>`;
+            }
         }
     }
 }
@@ -608,30 +643,17 @@ function handleAdviceError(error) {
 function prepareAiAdviceTab() {
     const aiRecommendations = document.getElementById('aiRecommendations');
 
-    // Gemini APIキーが環境変数に設定されているか確認
-    const hasApiKey = window.ENV && window.ENV.GEMINI_API_KEY;
-
     // メインのAIコメント領域にローディング表示
     if (aiRecommendations) {
-        // すでに内容がある場合は上書きしない
-        if (aiRecommendations.textContent.includes('分析結果を読み込み中') || aiRecommendations.innerHTML.includes('animate-spin')) {
-            aiRecommendations.innerHTML = `
-            <div class="flex justify-center items-center py-6">
-                <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mr-3"></div>
-                <p class="text-gray-600 text-lg">AIアドバイスを生成中...</p>
-            </div>`;
-        }
-    }
-
-    // APIキーがない場合の警告表示
-    if (!hasApiKey && aiRecommendations) {
+        // AIアドバイス生成中のメッセージを表示
         aiRecommendations.innerHTML = `
-        <div class="text-center p-6 bg-yellow-50 rounded-lg border border-yellow-200">
-            <div class="text-yellow-600 mb-3"><i class="fas fa-exclamation-triangle text-3xl"></i></div>
-            <h4 class="font-medium mb-2 text-lg">Gemini APIキーが設定されていません</h4>
-            <p class="mb-3">詳細な作物分析アドバイスを受け取るには、サーバー側の環境変数に Gemini APIキーを設定してください。</p>
+        <div class="flex justify-center items-center py-6">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mr-3"></div>
+            <p class="text-gray-600 text-lg">AIアドバイスを生成中...</p>
         </div>`;
     }
+    
+    // APIキー設定チェックは削除 - 実際のAPI呼び出し失敗時に処理するため
 }
 
 // 分析用の圃場データを取得する
