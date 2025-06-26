@@ -1,7 +1,7 @@
 {
-  "name": "hatakehealth",
-  "version": "1.0.0",
-  "description": "",
+  "name": "agrilens",
+  "version": "0.1.0",
+  "description": "AgriLens デモ版",
   "main": "server.js",
   "scripts": {
     "test": "jest",
@@ -10,8 +10,8 @@
     "start": "node server.js"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "akifumi",
+  "license": "(MIT AND Commons-Clause)",
   "type": "commonjs",
   "dependencies": {
     "@google/earthengine": "^0.1.419",
