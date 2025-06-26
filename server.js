@@ -31,10 +31,11 @@ const oauth2Client = new OAuth2Client(
 const hasFileAuth = process.env.GOOGLE_PRIVATE_KEY_PATH;
 const hasEnvAuth = process.env.GOOGLE_PRIVATE_KEY && process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PROJECT_ID;
 
-if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    console.log('警告: OAuth2認証に必要な環境変数が設定されていません。');
-    console.log('GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET が必要です。');
-}
+// OAuth2認証は任意のため警告を削除
+// if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+//     console.log('警告: OAuth2認証に必要な環境変数が設定されていません。');
+//     console.log('GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET が必要です。');
+// }
 
 if (!hasFileAuth && !hasEnvAuth) {
     console.log('警告: Earth Engine認証に必要な環境変数が設定されていません。');

@@ -67,4 +67,9 @@
     background-color: #16a34a;
     border-radius: 9999px;
     transition: width 0.3s ease;
+}
+
+/* AIモデル選択器を非表示 */
+#ai-model-selector {
+    display: none;
 } 

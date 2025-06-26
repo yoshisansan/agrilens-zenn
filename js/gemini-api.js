@@ -496,6 +496,12 @@ async function getChatResponse(analysisData, chatData) {
         };
     }
     
+    // おすすめ質問タイプの場合の特別処理
+    if (chatData.type === 'suggested_questions') {
+        console.log('おすすめ質問生成モード:', chatData.message.substring(0, 100) + '...');
+        return await generateSuggestedQuestionsResponse(chatData.message);
+    }
+    
     // チャット用プロンプトを作成
     const context = chatData.context || {};
     // 現在の圃場データを自然な文章で表現
@@ -664,6 +670,104 @@ ${selectedDetails.map((detail, index) => `
         return { 
             error: error.message,
             chatResponse: "エラーが発生しました: " + error.message 
+        };
+    }
+}
+
+// おすすめ質問生成専用の関数
+async function generateSuggestedQuestionsResponse(prompt) {
+    try {
+        // GemmaまたはGemini 2.0を使用してJSON形式のレスポンスを生成
+        const apiKey = getGeminiApiKey();
+        
+        // JSON形式のレスポンスを明確に要求するプロンプトを追加
+        const enhancedPrompt = prompt + `
+
+IMPORTANT: あなたは必ず以下のJSON形式で回答してください。他の形式は一切使用しないでください：
+
+{
+  "questions": [
+    "質問1のテキスト",
+    "質問2のテキスト",
+    "質問3のテキスト"
+  ]
+}
+
+JSON以外のテキストや説明は一切含めず、上記のJSON形式のみで回答してください。`;
+
+        console.log('おすすめ質問生成用プロンプト送信中...');
+        const responseText = await fetchGeminiResponse(apiKey, enhancedPrompt);
+        
+        if (responseText && typeof responseText === 'string') {
+            // JSON レスポンスを解析
+            try {
+                console.log('おすすめ質問レスポンス（最初の500文字）:', responseText.substring(0, 500));
+                
+                // JSONブロックを抽出
+                let jsonText = responseText.trim();
+                
+                // コードブロック（```json ... ```）から JSON を抽出
+                const jsonMatch = jsonText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+                if (jsonMatch) {
+                    jsonText = jsonMatch[1];
+                    console.log('コードブロックからJSONを抽出しました');
+                }
+                
+                // 最初と最後の中括弧の間を抽出
+                const startBrace = jsonText.indexOf('{');
+                const endBrace = jsonText.lastIndexOf('}');
+                if (startBrace !== -1 && endBrace !== -1 && endBrace > startBrace) {
+                    jsonText = jsonText.substring(startBrace, endBrace + 1);
+                }
+                
+                const parsedResponse = JSON.parse(jsonText);
+                console.log('おすすめ質問のJSONパース成功:', parsedResponse);
+                
+                if (parsedResponse.questions && Array.isArray(parsedResponse.questions)) {
+                    return { 
+                        chatResponse: JSON.stringify(parsedResponse),
+                        success: true 
+                    };
+                } else {
+                    console.warn('questionsフィールドが見つからないかarray形式ではありません');
+                    throw new Error('Invalid JSON structure');
+                }
+            } catch (parseError) {
+                console.error('おすすめ質問JSONパースエラー:', parseError);
+                console.log('パース失敗時の生レスポンス:', responseText);
+                
+                // デフォルトの質問を返す
+                const defaultQuestions = {
+                    "questions": [
+                        "この圃場の現在の状態は？",
+                        "改善できる点はありますか？",
+                        "次に何をすれば良いですか？"
+                    ]
+                };
+                
+                return {
+                    chatResponse: JSON.stringify(defaultQuestions),
+                    success: true
+                };
+            }
+        } else {
+            throw new Error('Invalid response format');
+        }
+    } catch (error) {
+        console.error('おすすめ質問生成エラー:', error);
+        
+        // エラー時のデフォルト応答
+        const defaultQuestions = {
+            "questions": [
+                "この圃場の状態を詳しく教えて",
+                "改善方法を教えてください",
+                "次のステップは何ですか？"
+            ]
+        };
+        
+        return {
+            chatResponse: JSON.stringify(defaultQuestions),
+            success: true
         };
     }
 }
