@@ -38,8 +38,16 @@ class ModuleManager {
         
         // 依存関係を先に初期化
         const deps = {};
-        for (const depName of module.dependencies) {
-            deps[depName] = this.initialize(depName);
+        const dependencies = module.dependencies;
+        
+        // dependenciesが配列でない場合の安全チェック
+        if (Array.isArray(dependencies)) {
+            for (const depName of dependencies) {
+                deps[depName] = this.initialize(depName);
+            }
+        } else if (dependencies && typeof dependencies === 'object') {
+            // dependenciesがオブジェクトの場合は空の配列として扱う
+            console.warn(`Module '${name}' has invalid dependencies format:`, dependencies);
         }
         
         // モジュールインスタンス作成

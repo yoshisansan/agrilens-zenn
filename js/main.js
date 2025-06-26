@@ -3,8 +3,19 @@ window.ENV = window.ENV || {};
 
 // ページ初期化時の処理
 document.addEventListener('DOMContentLoaded', async () => {
-    // 他の初期化処理
-    initializeApp();
+    try {
+        // 設定の初期化を最初に実行
+        if (window.configManager) {
+            await window.configManager.initialize();
+        }
+        
+        // その後にアプリケーションの初期化
+        initializeApp();
+    } catch (error) {
+        console.error('アプリケーション初期化エラー:', error);
+        // フォールバックとして基本機能のみ初期化
+        initializeApp();
+    }
 });
 
 // 最新の分析データを保存するグローバル変数

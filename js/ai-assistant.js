@@ -478,53 +478,9 @@ function getLatestAnalysisData() {
     return window.latestAnalysisData || null;
 }
 
-// 質問と回答のペアを表示エリアに追加
-function addQuestionAnswerPair(question, answer) {
-    const responsesContainer = document.getElementById('aiResponses');
-    const template = document.getElementById('aiResponseTemplate');
-    
-    if (!responsesContainer || !template) {
-        console.error('AIレスポンス表示に必要なHTML要素が見つかりません');
-        return;
-    }
-    
-    // テンプレートをクローン
-    const newResponse = template.cloneNode(true);
-    newResponse.id = ''; // テンプレートIDを削除
-    newResponse.classList.remove('hidden'); // 表示する
-    
-    // 質問と回答をセット
-    const questionElement = newResponse.querySelector('.question-text');
-    const answerElement = newResponse.querySelector('.answer-text');
-    
-    if (questionElement && answerElement) {
-        questionElement.textContent = question;
-        answerElement.textContent = answer;
-    }
-    
-    // 表示エリアの先頭に追加（新しい質問が上に来るようにする）
-    const responsesList = responsesContainer.querySelector('.space-y-3');
-    if (responsesList) {
-        responsesList.insertBefore(newResponse, responsesList.firstChild);
-    } else {
-        responsesContainer.appendChild(newResponse);
-    }
-    
-    // 履歴に追加
-    questionHistory.push({ question, answer, timestamp: new Date().toISOString() });
-}
 
-// ローディング表示の切り替え
-function showLoading(show) {
-    const loadingElement = document.getElementById('aiResponseLoading');
-    if (loadingElement) {
-        if (show) {
-            loadingElement.classList.remove('hidden');
-        } else {
-            loadingElement.classList.add('hidden');
-        }
-    }
-}
+
+
 
 // 質問履歴をローカルストレージに保存
 function saveQuestionHistory() {
@@ -544,9 +500,10 @@ function loadQuestionHistory() {
         if (savedHistory) {
             questionHistory = JSON.parse(savedHistory);
             
-            // 保存されていた履歴を表示
+            // 保存されていた履歴を表示（ダッシュボードチャット形式）
             questionHistory.forEach(item => {
-                addQuestionAnswerPair(item.question, item.answer);
+                showDashboardUserMessage(item.question);
+                showDashboardAiMessage(item.answer, true); // 履歴は実際のAIレスポンスとして表示
             });
         }
     } catch (error) {

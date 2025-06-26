@@ -226,35 +226,27 @@ function prepareAiPrompt(userMessage, fieldData, analysisData) {
 
 // Gemini APIによるチャットレスポンスの取得
 async function fetchGeminiChatResponse(apiKey, prompt, history) {
-    // Gemini APIのエンドポイント
-    const apiEndpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-06-17:generateContent';
+    // 統合AI APIのエンドポイント（Vertex AI対応）
+    const apiEndpoint = '/api/ai-advice';
     
     // チャット履歴から最大5つの会話を取得
     const recentHistory = history.slice(-5);
     
-    // 会話履歴をGemini API形式に変換
-    const chatHistory = recentHistory.map(item => ({
-        role: item.role,
-        parts: [{ text: item.content }]
-    }));
-    
-    // システムプロンプト（指示）を追加
-    chatHistory.unshift({
-        role: 'model',
-        parts: [{ text: prompt }]
-    });
+    // 履歴をプロンプトに統合（Vertex AI形式）
+    let fullPrompt = prompt;
+    if (recentHistory.length > 0) {
+        const historyText = recentHistory.map(item => 
+            `${item.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${item.content}`
+        ).join('\n');
+        fullPrompt = `これまでの会話履歴:\n${historyText}\n\n現在の質問:\n${prompt}`;
+    }
     
     const requestData = {
-        contents: chatHistory,
-        generationConfig: {
-            temperature: 0.3,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1024,
-        }
+        prompt: fullPrompt,
+        model: 'gemini-2.0-flash-thinking-exp-01-21' // 最新モデル
     };
     
-    const response = await fetch(`${apiEndpoint}?key=${apiKey}`, {
+    const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -264,23 +256,17 @@ async function fetchGeminiChatResponse(apiKey, prompt, history) {
     
     if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(`Gemini API エラー: ${errorData.error.message}`);
+        throw new Error(`AI API エラー: ${errorData.error || response.status}`);
     }
     
     const responseData = await response.json();
     
     // レスポンスから回答テキストを抽出
-    if (responseData.candidates && 
-        responseData.candidates[0] && 
-        responseData.candidates[0].content && 
-        responseData.candidates[0].content.parts && 
-        responseData.candidates[0].content.parts[0] &&
-        responseData.candidates[0].content.parts[0].text) {
-        
-        return responseData.candidates[0].content.parts[0].text;
+    if (responseData.success && responseData.result) {
+        return responseData.result;
     }
     
-    throw new Error('Gemini APIからの回答を解析できませんでした');
+    throw new Error('AI APIからの回答を解析できませんでした');
 }
 
 // モック（サンプル）チャットレスポンスの生成

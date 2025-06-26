@@ -1,98 +1,122 @@
-# 畑の健康診断 - 複数植生指標分析機能
+# AgriLens - 農地分析システム
 
-## 概要
+農地の衛星画像分析とAIによる作物健康状態評価を行うWebアプリケーションです。
 
-Google Earth Engine (GEE) を使用して、以下の3つの植生指標を計算・分析する機能を実装しました：
+## 新機能: Vertex AI 対応
 
-1. **NDVI (Normalized Difference Vegetation Index)** - 植生の活力指標
-   - 植物の光合成活性や植生の活力を示します
-   - 計算式: (NIR - RED) / (NIR + RED)
+### Vertex AI経由でのGemini/Gemma API利用
 
-2. **NDMI (Normalized Difference Moisture Index)** - 水分ストレス指標
-   - 植物の水分含有量や水分ストレスを示します
-   - 計算式: (NIR - SWIR1) / (NIR + SWIR1)
+本システムは、Google Cloud Vertex AI経由でGeminiおよびGemmaモデルを利用できるようになりました。
 
-3. **NDRE (Red Edge Normalized Difference Vegetation Index)** - 栄養状態指標
-   - 葉の窒素含有量や栄養状態を示します
-   - 計算式: (NIR - RedEdge) / (NIR + RedEdge)
+#### セットアップ手順
 
-## 実装内容
+1. **Google Cloud プロジェクトの設定**
+   ```bash
+   # Google Cloud CLIをインストール
+   curl https://sdk.cloud.google.com | bash
+   
+   # 認証
+   gcloud auth login
+   
+   # プロジェクトを設定
+   gcloud config set project YOUR_PROJECT_ID
+   ```
 
-### 1. 植生指標計算モジュール (vegetation-indices.js)
+2. **Vertex AI APIの有効化**
+   ```bash
+   gcloud services enable aiplatform.googleapis.com
+   ```
 
-複数の植生指標を計算し、それぞれの健康状態を評価するための関数群を実装しています。作物タイプに応じた閾値設定も行い、総合的な健康診断と推奨アクションを生成します。
+3. **サービスアカウントの作成**
+   ```bash
+   # サービスアカウント作成
+   gcloud iam service-accounts create agrilens-ai \
+     --description="AgriLens AI Service Account" \
+     --display-name="AgriLens AI"
+   
+   # 権限付与
+   gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+     --member="serviceAccount:agrilens-ai@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+     --role="roles/aiplatform.user"
+   
+   # キーファイル作成
+   gcloud iam service-accounts keys create ./service-account-key.json \
+     --iam-account=agrilens-ai@YOUR_PROJECT_ID.iam.gserviceaccount.com
+   ```
 
-```javascript
-// 主な機能
-- calculateNDVI(image)     // NDVI計算
-- calculateNDMI(image)     // NDMI計算
-- calculateNDRE(image)     // NDRE計算
-- calculateAllIndices(image) // 3つの指標を一度に計算
-- evaluateIndicesHealth(stats, cropType) // 健康状態評価
-- generateOverallDiagnosis(evaluation) // 総合評価と推奨アクション
+4. **環境変数の設定**
+   ```bash
+   # .envファイルを作成
+   cp .env.example .env
+   
+   # 以下の変数を設定
+   GOOGLE_PROJECT_ID=your-project-id
+   GOOGLE_CLOUD_REGION=asia-northeast1
+   GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+   GOOGLE_CLIENT_EMAIL=your-service-account@your-project-id.iam.gserviceaccount.com
+   GOOGLE_PRIVATE_KEY_ID=your-private-key-id
+   AI_API_PROVIDER=vertex
+   AI_MODEL=gemini-2.0-flash-thinking-exp-01-21
+   ```
+
+5. **依存関係のインストール**
+   ```bash
+   npm install
+   ```
+
+#### 利用可能なモデル
+
+**Geminiモデル:**
+- `gemini-1.5-flash`: 高速応答、コスト効率重視
+- `gemini-1.5-pro`: 高精度、複雑なタスク向け
+- `gemini-2.0-flash-thinking-exp-01-21`: 最新の思考型モデル（実験的機能、推奨）
+
+**Gemmaモデル:**
+- `gemma-2-9b-it`: オープンソース、中規模モデル
+- `gemma-2-27b-it`: オープンソース、大規模モデル
+
+#### モデル選択
+
+Webアプリケーション上でリアルタイムにモデルを切り替えることができます。選択したモデル設定は自動的に保存されます。
+
+## 従来のGemini API（直接利用）
+
+Vertex AIを使用しない場合は、従来通り直接Gemini APIを利用できます：
+
+```bash
+# .envファイルで設定
+AI_API_PROVIDER=gemini-direct
+GEMINI_API_KEY=your_api_key
 ```
 
-### 2. マップ表示機能 (map.js)
+## 機能
 
-各植生指標レイヤーの表示・切り替え機能を実装しています。
+- 🛰️ 衛星画像による植生指標分析（NDVI、NDMI、NDRE）
+- 🤖 AI農業アドバイザー（Gemini/Gemma対応）
+- 📊 時系列データの可視化
+- 📋 圃場管理とデータエクスポート
+- 💬 インタラクティブなAIチャット
 
-```javascript
-// 主な機能
-- addNdviLayer() // NDVI指標レイヤーの表示
-- addNdmiLayer() // NDMI指標レイヤーの表示
-- addNdreLayer() // NDRE指標レイヤーの表示
-- toggleVegetationLayer() // 指標レイヤーの切り替え
+## 技術スタック
+
+- **フロントエンド**: HTML5, CSS3, JavaScript, Leaflet.js
+- **バックエンド**: Node.js, Express
+- **AI**: Google Cloud Vertex AI (Gemini/Gemma)
+- **データ**: ローカルストレージ, CSVエクスポート
+
+## 開発・起動
+
+```bash
+# 依存関係インストール
+npm install
+
+# 開発サーバー起動
+npm start
+
+# テスト実行
+npm test
 ```
 
-### 3. 分析結果表示機能 (analysis.js)
+## ライセンス
 
-各植生指標の分析結果をUIに表示する機能を実装しています。
-
-```javascript
-// 主な機能
-- processIndicesStats() // 統計データの整形
-- evaluateFieldHealth() // 健康状態の総合評価
-- updateHealthSummary() // 健康サマリーの更新
-- updateAiComment() // AI診断コメントの更新
-- updateDetailedStats() // 詳細統計の更新
-```
-
-### 4. サーバーサイド処理 (server.js)
-
-GEEからのデータ取得と植生指標計算を行うAPIエンドポイントを実装しています。
-
-```javascript
-// 主な機能
-- /api/analyze: Sentinel-2画像からNDVI、NDMI、NDREを計算
-- generateMockVegetationData(): GEE非接続時のモックデータ生成
-```
-
-### 5. 設定ファイル (config.js)
-
-各植生指標の閾値設定を追加しました。
-
-```javascript
-// 設定内容
-- NDVI閾値設定
-- NDMI閾値設定
-- NDRE閾値設定
-- 各指標の表示パレット設定
-```
-
-## 使用方法
-
-1. マップ上で圃場（ポリゴン）を描画または選択
-2. 「分析開始」ボタンをクリック
-3. 分析結果パネルに各植生指標の結果が表示される
-4. 指標切り替えボタン（NDVI、NDMI、NDRE）で表示レイヤーを切り替え可能
-
-## 技術詳細
-
-- **データソース**: Sentinel-2衛星画像（Google Earth Engine経由）
-- **空間解像度**: 10m（NDVI、NDRE）、20m（NDMI）
-- **計算バンド**:
-  - NDVI: B8（NIR）、B4（Red）
-  - NDMI: B8（NIR）、B11（SWIR1）
-  - NDRE: B8（NIR）、B5（Red Edge）
-
-この機能の実装により、畑の健康状態をより多角的に分析できるようになりました。植生の活力だけでなく、水分ストレスや栄養状態も同時に評価することで、より詳細な診断と適切な対策を提案できます。
+MIT License

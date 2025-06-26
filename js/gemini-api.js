@@ -3,12 +3,27 @@
 // プロンプトテンプレートは直接関数内に埋め込むため、この変数は不要になりました。
 
 /**
+ * 現在のAI設定を取得する関数
+ * @returns {Object} AI設定オブジェクト
+ */
+function getAiConfig() {
+    return {
+        provider: 'vertex', // または 'gemini-direct'
+        defaultModel: 'gemini-2.0-flash-thinking-exp-01-21',
+        availableModels: {
+            gemini: ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-thinking-exp-01-21'],
+            gemma: ['gemma-2-9b-it', 'gemma-2-27b-it']
+        }
+    };
+}
+
+/**
  * Gemini APIキーを取得する関数
  * 環境変数から取得し、なければローカルストレージを確認
  * @returns {string} APIキーまたは特別フラグ
  */
 function getGeminiApiKey() {
-    console.log('サーバーサイドでのAPI呼び出しを使用するモードで動作します');
+    console.log('サーバーサイドでのAI API呼び出しを使用するモードで動作します');
     
     // サーバーサイドの実装に合わせて、必ずサーバーにリクエストを送るようにする
     return 'USE_SERVER';
@@ -383,14 +398,20 @@ async function processServerSideGeminiRequest(prompt) {
     }
 }
 
-// Gemini APIリクエスト実行
-async function makeGeminiApiRequest(prompt) {
-    const fetchPromise = fetch('/api/gemini-advice', {
+// AI APIリクエスト実行（統合エンドポイント使用）
+async function makeGeminiApiRequest(prompt, modelName = null) {
+    const aiConfig = getAiConfig();
+    const selectedModel = modelName || aiConfig.defaultModel;
+    
+    const fetchPromise = fetch('/api/ai-advice', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ 
+            prompt,
+            model: selectedModel
+        })
     });
     
     const timeoutPromise = new Promise((_, reject) => {
