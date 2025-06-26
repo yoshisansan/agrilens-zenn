@@ -1,0 +1,134 @@
+# コード品質定期検診チェックリスト
+# Version: 2.0
+# Project: agrilens-zenn
+# Purpose: ハッカソン提出に向けたコード品質の向上と、継続的な品質維持
+# 特記事項: HTML/JS/CSSとGemini API連携に特化した項目を強化
+
+metadata:
+  last_checked: "2025-06-26"
+  checked_by: "your_name"
+  next_check_date: ""
+  overall_score: 0  # 100点満点
+
+# 1. プロジェクト構造とドキュメント (Project Structure & Documentation)
+project_structure:
+  readme:
+    - [ ] README.mdにプロジェクトの目的・背景が明確に記載されている
+    - [ ] セットアップ手順が具体的で、誰でも環境構築が可能
+    - [ ] 使用技術スタック（バージョン情報含む）が明記されている
+    - [ ] デモURL、または動作がわかるスクリーンショットやGIFが掲載されている
+  directory_structure:
+    - [ ] ディレクトリ構造が直感的（例: /src, /public, /assets, /components）
+    - [ ] 不要なファイルや実験用のコードが削除されている
+    - [ ] .gitignoreが適切で、不要なファイル（.env, node_modules等）を追跡していない
+  documentation:
+    - [ ] .env.exampleが存在し、必要な環境変数がすべて記載されている
+    - [ ] システム構成図や主要なデータフロー図がある
+    - [ ] 主要な関数やロジックについて、JSDoc形式でコメントが記述されている
+
+# 2. コード品質 (Code Quality)
+code_quality:
+  general:
+    - [ ] Linter (ESLint) と Formatter (Prettier) が導入され、CIで実行されている
+    - [ ] 命名規則（変数、関数、ファイル）に一貫性があり、意味が分かりやすい
+    - [ ] 1つの関数・ファイルは1つの責任を持つ（単一責任の原則）
+    - [ ] ネストが深すぎる箇所（3段階以上）はリファクタリングされている
+    - [ ] TODOやFIXMEコメントが整理され、Issue等で管理されている
+    - [ ] 不要なコメントアウトされたコードが削除されている
+  html_css:
+    - [ ] セマンティックHTMLタグ（<main>, <section>, <article>等）が適切に使用されている
+    - [ ] W3Cのバリデーションエラーがない
+    - [ ] CSSの命名規則（BEM等）があり、スタイルが意図せず競合しない
+    - [ ] CSS変数を活用し、色やフォントサイズなどの管理が容易になっている
+    - [ ] レスポンシブデザインが考慮され、主要なデバイス幅でレイアウトが崩れない
+  javascript:
+    - [ ] ES Modulesを利用してコードが適切にモジュール分割されている
+    - [ ] DOM操作が効率的に行われ、不要な再描画を防いでいる
+    - [ ] `async/await`が正しく使われ、Promiseのハンドリング漏れがない
+    - [ ] `console.log`などのデバッグ用コードが本番ビルドに含まれていない
+
+# 3. Gemini API連携 (Gemini API Integration)
+gemini_integration:
+  security:
+    - [ ] APIキーがクライアントサイドのJSコードに直接記述されていない
+    - [ ] API呼び出しはサーバーサイド（or BFF）経由で行われ、クライアントにキーが公開されない
+    - [ ] APIキーが.envファイルで管理され、リポジトリにコミットされていない
+  error_handling:
+    - [ ] APIからのエラーレスポンス（レート制限、不正な入力等）を捕捉し、ユーザーにフィードバックしている
+    - [ ] APIリクエスト中のローディング状態（スピナー等）がUIに表示される
+    - [ ] APIリクエストのタイムアウト処理が実装されている
+  performance_and_cost:
+    - [ ] ユーザーの連続操作などで不要なAPIリクエストが連続送信されない（デバウンス等）
+    - [ ] APIへのリクエスト内容（プロンプト等）が最適化されている
+    - [ ] ストリーミングレスポンスを利用し、ユーザーの体感速度を向上させている（該当する場合）
+  prompt_management:
+    - [ ] プロンプトがコードから分離され、管理・改善しやすい（例: 定数ファイルやテンプレートとして管理）
+    - [ ] プロンプトインジェクションに対する基本的な対策が検討されている
+
+# 4. セキュリティ (Security)
+security:
+  - [ ] ユーザー入力のサニタイズ処理が実装され、XSS（クロスサイトスクリプティング）対策がされている
+  - [ ] 依存ライブラリに既知の脆弱性がないかチェックされている（npm audit等）
+  - [ ] httpsが強制され、混合コンテンツ（mixed content）が存在しない
+
+# 5. パフォーマンス (Performance)
+performance:
+  - [ ] 画像が最適化（圧縮、WebP形式の利用）されている
+  - [ ] CSSやJSファイルが圧縮（minify）されている
+  - [ ] ブラウザのキャッシュが適切に活用されている
+  - [ ] Lighthouseスコアで大きな問題（特にPerformance, Accessibility）が指摘されていない
+
+# 6. UI/UXとアクセシビリティ (UI/UX & Accessibility)
+ui_ux_accessibility:
+  - [ ] UIコンポーネントのデザインや挙動に一貫性がある
+  - [ ] エラーメッセージが分かりやすく、ユーザーが次に行うべきアクションを示している
+  - [ ] 全ての画像に適切な`alt`属性が設定されている
+  - [ ] キーボードのみで主要な操作が可能である
+  - [ ] 見出しタグ（<h1>, <h2>等）が文書構造として正しく使用されている
+  - [ ] 十分なカラーコントラストが確保されている
+
+# 7. Gitとデプロイ (Version Control & Deployment)
+git_and_deployment:
+  - [ ] コミットメッセージが規約（Conventional Commits等）に沿って分かりやすく書かれている
+  - [ ] main/masterブランチが保護され、直接pushできないようになっている
+  - [ ] 不要なブランチが定期的に削除されている
+  - [ ] ビルドプロセスが自動化されており、誰でも同じ成果物を生成できる
+
+# 8. ハッカソン特有項目 (Hackathon Specifics)
+hackathon_specific:
+  - [ ] デモがスムーズに行える（キラー機能がすぐに実演できる）
+  - [ ] Geminiの活用方法がこのプロジェクトの独自性・魅力として明確に示されている
+  - [ ] READMEやプレゼン資料で、技術的な挑戦や工夫した点がアピールされている
+  - [ ] ライセンス情報（MITなど）が明記されたLICENSEファイルが存在する
+
+# アクションアイテム (Action Items)
+action_items:
+  high_priority:  # 提出前に必須
+    - item: "（例）APIキーをサーバーサイド経由で呼び出すように修正"
+      assigned_to: ""
+      deadline: ""
+  medium_priority:  # できれば対応
+    - item: "（例）レスポンシブデザインの改善"
+      assigned_to: ""
+      deadline: ""
+  low_priority:  # 時間があれば対応
+    - item: "（例）JSDocコメントの拡充"
+      assigned_to: ""
+      deadline: ""
+
+# スコアリング（各セクション10点満点、合計80点）
+scoring:
+  project_structure: 0
+  code_quality: 0
+  gemini_integration: 0
+  security: 0
+  performance: 0
+  ui_ux_accessibility: 0
+  git_and_deployment: 0
+  hackathon_specific: 0
+  total: 0
+
+# メモ・備考
+notes: |
+  - 定期検診は、タイミングを決めて実施する。
+  - スコアは客観的な指標として活用し、低い項目から優先的に改善に取り組む。

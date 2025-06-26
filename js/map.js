@@ -230,7 +230,7 @@ function displayGeoJSON(geoJSON, color) {
                 color: color || CONFIG.FIELDS.DEFAULT_COLOR,
                 weight: 3,
                 opacity: 0.7,
-                fillOpacity: 0.1
+                fillOpacity: 0
             }
         });
         
@@ -286,7 +286,7 @@ function loadSavedFields() {
                         color: field.color || CONFIG.FIELDS.DEFAULT_COLOR,
                         weight: 2,
                         opacity: 0.6,
-                        fillOpacity: 0.1
+                        fillOpacity: 0
                     }
                 });
                 
@@ -454,7 +454,7 @@ function displayMultipleFields(fieldIds) {
                     color: color,
                     weight: 3,
                     opacity: 0.8,
-                    fillOpacity: 0.2
+                    fillOpacity: 0
                 }
             });
             

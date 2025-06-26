@@ -369,73 +369,6 @@
 
         <!-- Main Content -->
         <div class="flex-1">
-            <!-- AI Assistant -->
-            <div class="bg-white shadow-lg rounded-lg p-4 mb-4">
-                <div class="flex items-center space-x-2 mb-2">
-                    <h2 class="text-lg font-semibold text-gray-800">AI アシスタント</h2>
-                    <span class="text-sm text-gray-600">(チャット形式で農業アドバイスを提供します)</span>
-                </div>
-                <div class="flex flex-col space-y-3">
-                    <!-- Analysis History Selection -->
-                    <div id="aiAssistantHistorySelection" class="border border-gray-200 rounded-md p-3 bg-gray-50">
-                        <div class="flex items-center justify-between mb-2">
-                            <label class="text-sm font-medium text-gray-700">参照する分析データを選択 (複数選択可)</label>
-                            <button onclick="refreshAiAssistantHistory()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition-colors">
-                                <i class="fas fa-sync-alt mr-1"></i>更新
-                            </button>
-                        </div>
-                        <div id="aiHistoryCheckboxes" class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-                            <!-- 分析履歴のチェックボックスが動的に挿入される -->
-                        </div>
-                        <div id="aiHistoryEmpty" class="text-center py-2 text-gray-500 text-sm hidden">
-                            分析履歴がありません
-                        </div>
-                        <div class="mt-2 text-xs text-gray-500">
-                            <span id="selectedAnalysisCount">0</span>件選択中
-                        </div>
-                    </div>
-                    
-                    <!-- Chat Interface -->
-                    <div id="dashboardChatContainer" class="border border-gray-200 rounded-md">
-                        <!-- Chat Messages -->
-                        <div id="dashboardChatMessages" class="h-64 overflow-y-auto p-3 bg-gray-50 space-y-3">
-                            <!-- Welcome message -->
-                            <div class="chat-message ai-message">
-                                <div class="flex items-start">
-                                    <div class="flex-shrink-0">
-                                        <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                                            <i class="fas fa-robot text-green-500"></i>
-                                        </div>
-                                    </div>
-                                    <div class="ml-3 bg-green-100 rounded-lg py-2 px-3 max-w-[85%]">
-                                        <p class="text-sm text-gray-800">こんにちは！農地分析AIアシスタントです。圃場データの分析や作物の健康状態について質問してください。</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Chat Input -->
-                        <div class="border-t border-gray-200 p-3 bg-white">
-                            <div class="flex items-center space-x-2">
-                                <input 
-                                    type="text" 
-                                    id="dashboardChatInput" 
-                                    placeholder="圃場や作物について質問してください..." 
-                                    class="flex-1 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                    autocomplete="off"
-                                >
-                                <button id="dashboardChatSend" class="bg-green-600 hover:bg-green-700 text-white p-2 rounded-md">
-                                    <i class="fas fa-paper-plane"></i>
-                                </button>
-                                <button id="dashboardChatClear" class="text-gray-400 hover:text-gray-600 p-2" title="チャット履歴をクリア">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Map Controls -->
             <div class="bg-white shadow-lg rounded-lg p-4 mb-4">
                 <div class="flex flex-wrap items-center justify-between">
@@ -550,6 +483,73 @@
                 <!-- 生成時刻 -->
                 <div class="text-right text-xs text-gray-500">
                     <span id="analysisGeneratedTime">生成時刻: -</span>
+                </div>
+            </div>
+
+            <!-- AI Assistant (positioned below analysis results when shown, otherwise before history) -->
+            <div class="bg-white shadow-lg rounded-lg p-4 mb-4">
+                <div class="flex items-center space-x-2 mb-2">
+                    <h2 class="text-lg font-semibold text-gray-800">AI アシスタント</h2>
+                    <span class="text-sm text-gray-600">(チャット形式で農業アドバイスを提供します)</span>
+                </div>
+                <div class="flex flex-col space-y-3">
+                    <!-- Analysis History Selection -->
+                    <div id="aiAssistantHistorySelection" class="border border-gray-200 rounded-md p-3 bg-gray-50">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-sm font-medium text-gray-700">参照する分析データを選択 (複数選択可)</label>
+                            <button onclick="refreshAiAssistantHistory()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition-colors">
+                                <i class="fas fa-sync-alt mr-1"></i>更新
+                            </button>
+                        </div>
+                        <div id="aiHistoryCheckboxes" class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+                            <!-- 分析履歴のチェックボックスが動的に挿入される -->
+                        </div>
+                        <div id="aiHistoryEmpty" class="text-center py-2 text-gray-500 text-sm hidden">
+                            分析履歴がありません
+                        </div>
+                        <div class="mt-2 text-xs text-gray-500">
+                            <span id="selectedAnalysisCount">0</span>件選択中
+                        </div>
+                    </div>
+                    
+                    <!-- Chat Interface -->
+                    <div id="dashboardChatContainer" class="border border-gray-200 rounded-md">
+                        <!-- Chat Messages -->
+                        <div id="dashboardChatMessages" class="h-64 overflow-y-auto p-3 bg-gray-50 space-y-3">
+                            <!-- Welcome message -->
+                            <div class="chat-message ai-message">
+                                <div class="flex items-start">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                                            <i class="fas fa-robot text-green-500"></i>
+                                        </div>
+                                    </div>
+                                    <div class="ml-3 bg-green-100 rounded-lg py-2 px-3 max-w-[85%]">
+                                        <p class="text-sm text-gray-800">こんにちは！農地分析AIアシスタントです。圃場データの分析や作物の健康状態について質問してください。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Chat Input -->
+                        <div class="border-t border-gray-200 p-3 bg-white">
+                            <div class="flex items-center space-x-2">
+                                <input 
+                                    type="text" 
+                                    id="dashboardChatInput" 
+                                    placeholder="圃場や作物について質問してください..." 
+                                    class="flex-1 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                    autocomplete="off"
+                                >
+                                <button id="dashboardChatSend" class="bg-green-600 hover:bg-green-700 text-white p-2 rounded-md">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                                <button id="dashboardChatClear" class="text-gray-400 hover:text-gray-600 p-2" title="チャット履歴をクリア">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
