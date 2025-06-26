@@ -1,21 +1,24 @@
 #map { height: 500px; }
 
 .ndvi-legend {
-    background: linear-gradient(to right, #d01c11, #f1b543, #4dac26);
+    background: linear-gradient(to right, var(--color-error-600), var(--color-warning-500), var(--color-success-600));
 }
 
 .drawing-controls {
-    transition: all 0.3s ease;
+    transition: all var(--transition-normal);
 }
 
 .sidebar {
-    transition: all 0.3s ease;
+    transition: all var(--transition-normal);
+    background-color: var(--sidebar-bg);
+    border-color: var(--sidebar-border);
+    color: var(--sidebar-text);
 }
 
 @media (max-width: 768px) {
     .sidebar {
         position: absolute;
-        z-index: 1000;
+        z-index: var(--z-dropdown);
         width: 80%;
         left: -100%;
         height: 100%;

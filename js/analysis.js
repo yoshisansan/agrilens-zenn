@@ -137,7 +137,8 @@ function processAndDisplayStats(data) {
     const formatNumber = (value) => {
         if (typeof value === 'string' && value === '-') return '-';
         const num = parseFloat(value);
-        const places = window.CONFIG?.UI?.DEFAULT_DECIMAL_PLACES || 3;
+        const config = window.ModuleManager?.get('config') || window.CONFIG;
+        const places = config?.UI?.DEFAULT_DECIMAL_PLACES || 3;
         return isNaN(num) ? '-' : num.toFixed(places);
     };
     
@@ -178,7 +179,8 @@ function updateAnalysisUI(stats, dateRange) {
     // 分析結果パネルの表示
     if (analysisResultsEl) {
         analysisResultsEl.classList.add('hidden');
-        const delay = window.CONFIG?.UI?.PANEL_ANIMATION_DELAY || 50;
+        const config = window.ModuleManager?.get('config') || window.CONFIG;
+        const delay = config?.UI?.PANEL_ANIMATION_DELAY || 50;
         setTimeout(() => {
             analysisResultsEl.classList.remove('hidden');
         }, delay);
@@ -196,7 +198,8 @@ function handleAnalysisCompletion(data, stats) {
     const formatNumber = (value) => {
         if (typeof value === 'string' && value === '-') return '-';
         const num = parseFloat(value);
-        const places = window.CONFIG?.UI?.DEFAULT_DECIMAL_PLACES || 3;
+        const config = window.ModuleManager?.get('config') || window.CONFIG;
+        const places = config?.UI?.DEFAULT_DECIMAL_PLACES || 3;
         return isNaN(num) ? '-' : num.toFixed(places);
     };
     
@@ -1598,7 +1601,8 @@ function updateHealthSummary(evaluation, stats) {
     const formatNumber = (value) => {
         if (typeof value === 'string' && value === '-') return '-';
         const num = parseFloat(value);
-        const places = window.CONFIG?.UI?.DEFAULT_DECIMAL_PLACES || 3;
+        const config = window.ModuleManager?.get('config') || window.CONFIG;
+        const places = config?.UI?.DEFAULT_DECIMAL_PLACES || 3;
         return isNaN(num) ? '-' : num.toFixed(places);
     };
     
@@ -1684,7 +1688,8 @@ function addStatRow(tableBody, indexName, description, statData, dateRange) {
     const formatNumber = (value) => {
         if (typeof value === 'string' && value === '-') return '-';
         const num = parseFloat(value);
-        const places = window.CONFIG?.UI?.DEFAULT_DECIMAL_PLACES || 3;
+        const config = window.ModuleManager?.get('config') || window.CONFIG;
+        const places = config?.UI?.DEFAULT_DECIMAL_PLACES || 3;
         return isNaN(num) ? '-' : num.toFixed(places);
     };
     

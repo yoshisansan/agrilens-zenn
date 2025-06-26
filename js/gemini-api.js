@@ -303,7 +303,8 @@ function generateDummyResponse(prompt) {
 
 // プロンプトからデータ抽出
 function extractDataFromPrompt(prompt) {
-    const defaults = window.CONFIG?.DEFAULTS || {};
+    const config = window.ModuleManager?.get('config') || window.CONFIG;
+    const defaults = config?.DEFAULTS || {};
     let cropType = defaults.CROP_TYPE || '不明';
     let ndviValue = String(defaults.NDVI_VALUE || 0.65);
     let ndmiValue = String(defaults.NDMI_VALUE || 0.42);
@@ -393,7 +394,8 @@ async function makeGeminiApiRequest(prompt) {
     });
     
     const timeoutPromise = new Promise((_, reject) => {
-        const timeout = window.CONFIG?.API?.GEMINI_TIMEOUT || 30000;
+        const config = window.ModuleManager?.get('config') || window.CONFIG;
+        const timeout = config?.API?.GEMINI_TIMEOUT || 30000;
         setTimeout(() => reject(new Error('リクエストがタイムアウトしました')), timeout);
     });
     
@@ -420,13 +422,33 @@ async function handleGeminiApiResponse(response, prompt) {
 
 // Gemini APIエラー処理
 async function handleGeminiApiError(response, prompt) {
-    const errorData = await response.json();
-    console.error('Gemini APIサーバーエラー:', response.status, errorData);
+    const errorHandler = window.ModuleManager?.get('errorHandler');
     
-    if (response.status === 500 && errorData.error === 'APIキー未設定') {
-        console.warn('GEMINI_API_KEYが設定されていません。ダミーデータを使用します。');
-    } else {
-        console.warn('Gemini APIエラーが発生しました。ダミーデータを使用します。エラー詳細:', errorData);
+    try {
+        const errorData = await response.json();
+        
+        if (errorHandler) {
+            errorHandler.handleApiError(response, {
+                context: 'gemini_api',
+                prompt: prompt.substring(0, 100) + '...',
+                errorData
+            });
+        } else {
+            console.error('Gemini APIサーバーエラー:', response.status, errorData);
+        }
+        
+        if (response.status === 500 && errorData.error === 'APIキー未設定') {
+            console.warn('GEMINI_API_KEYが設定されていません。ダミーデータを使用します。');
+        } else {
+            console.warn('Gemini APIエラーが発生しました。ダミーデータを使用します。エラー詳細:', errorData);
+        }
+    } catch (parseError) {
+        if (errorHandler) {
+            errorHandler.logError(parseError, {
+                context: 'gemini_api_error_parsing',
+                originalStatus: response.status
+            });
+        }
     }
     
     return generateDummyResponse(prompt);
