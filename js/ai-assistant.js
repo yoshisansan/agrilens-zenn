@@ -103,7 +103,7 @@ async function handleDashboardChatSubmit() {
         }
         
         // AIの返信を表示
-        showDashboardAiMessage(response, isRealAI);
+        await showDashboardAiMessage(response, isRealAI);
         
         // 履歴を保存
         questionHistory.push({ question: message, answer: response, timestamp: new Date().toISOString() });
@@ -115,7 +115,7 @@ async function handleDashboardChatSubmit() {
         removeDashboardThinkingMessage(thinkingId);
         
         // エラーメッセージを表示
-        showDashboardAiMessage('すみません、エラーが発生しました。しばらくしてからもう一度お試しください。');
+        await showDashboardAiMessage('すみません、エラーが発生しました。しばらくしてからもう一度お試しください。');
     }
 }
 
@@ -478,53 +478,9 @@ function getLatestAnalysisData() {
     return window.latestAnalysisData || null;
 }
 
-// 質問と回答のペアを表示エリアに追加
-function addQuestionAnswerPair(question, answer) {
-    const responsesContainer = document.getElementById('aiResponses');
-    const template = document.getElementById('aiResponseTemplate');
-    
-    if (!responsesContainer || !template) {
-        console.error('AIレスポンス表示に必要なHTML要素が見つかりません');
-        return;
-    }
-    
-    // テンプレートをクローン
-    const newResponse = template.cloneNode(true);
-    newResponse.id = ''; // テンプレートIDを削除
-    newResponse.classList.remove('hidden'); // 表示する
-    
-    // 質問と回答をセット
-    const questionElement = newResponse.querySelector('.question-text');
-    const answerElement = newResponse.querySelector('.answer-text');
-    
-    if (questionElement && answerElement) {
-        questionElement.textContent = question;
-        answerElement.textContent = answer;
-    }
-    
-    // 表示エリアの先頭に追加（新しい質問が上に来るようにする）
-    const responsesList = responsesContainer.querySelector('.space-y-3');
-    if (responsesList) {
-        responsesList.insertBefore(newResponse, responsesList.firstChild);
-    } else {
-        responsesContainer.appendChild(newResponse);
-    }
-    
-    // 履歴に追加
-    questionHistory.push({ question, answer, timestamp: new Date().toISOString() });
-}
 
-// ローディング表示の切り替え
-function showLoading(show) {
-    const loadingElement = document.getElementById('aiResponseLoading');
-    if (loadingElement) {
-        if (show) {
-            loadingElement.classList.remove('hidden');
-        } else {
-            loadingElement.classList.add('hidden');
-        }
-    }
-}
+
+
 
 // 質問履歴をローカルストレージに保存
 function saveQuestionHistory() {
@@ -544,9 +500,10 @@ function loadQuestionHistory() {
         if (savedHistory) {
             questionHistory = JSON.parse(savedHistory);
             
-            // 保存されていた履歴を表示
+            // 保存されていた履歴を表示（ダッシュボードチャット形式）
             questionHistory.forEach(item => {
-                addQuestionAnswerPair(item.question, item.answer);
+                showDashboardUserMessage(item.question);
+                showDashboardAiMessage(item.answer, true); // 履歴は実際のAIレスポンスとして表示
             });
         }
     } catch (error) {
@@ -582,9 +539,12 @@ function showDashboardUserMessage(message) {
 }
 
 // Dashboard Chat AIメッセージを表示
-function showDashboardAiMessage(message, isRealAI = false) {
+async function showDashboardAiMessage(message, isRealAI = false) {
     const chatMessages = document.getElementById('dashboardChatMessages');
     if (!chatMessages) return;
+    
+    // メッセージをクリーンアップして整形
+    const formattedMessage = formatMessageText(message);
     
     const messageElement = document.createElement('div');
     messageElement.className = 'chat-message ai-message';
@@ -604,7 +564,7 @@ function showDashboardAiMessage(message, isRealAI = false) {
             </div>
             <div class="ml-3 ${bgColor} rounded-lg py-2 px-3 max-w-[85%] border ${borderColor}">
                 ${isRealAI ? '' : '<div class="text-xs text-orange-600 mb-1"><i class="fas fa-info-circle"></i> デモモード（ダミーレスポンス）</div>'}
-                <p class="text-sm text-gray-800 whitespace-pre-wrap">${formatMessageText(message)}</p>
+                <div class="text-sm text-gray-800">${formattedMessage}</div>
                 ${!isRealAI ? '<div class="text-xs text-orange-600 mt-1">実際のAI回答を使用するには、GEMINI_API_KEYを設定してください。</div>' : ''}
             </div>
         </div>
@@ -612,9 +572,409 @@ function showDashboardAiMessage(message, isRealAI = false) {
     
     chatMessages.appendChild(messageElement);
     
+    console.log('=== DEBUG: showDashboardAiMessage - おすすめ質問生成呼び出し ===');
+    console.log('message長さ:', message?.length);
+    
+    // おすすめ質問コンポーネントを生成して追加
+    try {
+        await generateAndShowDashboardSuggestedQuestions(message);
+    } catch (error) {
+        console.error('おすすめ質問生成でエラー:', error);
+    }
+    
     // スクロールを一番下に
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
+
+// Dashboard用おすすめの質問を生成して表示する関数
+async function generateAndShowDashboardSuggestedQuestions(aiResponse) {
+    console.log('=== DEBUG: generateAndShowDashboardSuggestedQuestions 開始 ===');
+    console.log('aiResponse:', aiResponse?.substring(0, 100) + '...');
+    
+    try {
+        // 現在の圃場データと分析データを取得
+        const fieldData = getCurrentFieldData();
+        const analysisData = getLatestAnalysisData();
+        
+        // 選択された分析データも取得
+        const selectedAnalysisData = getSelectedAnalysisData();
+        
+        // 質問履歴の最後の質問を取得
+        const lastUserQuestion = questionHistory.length > 0 ? 
+            questionHistory[questionHistory.length - 1]?.question : '';
+        
+        console.log('=== DEBUG: おすすめ質問生成開始 ===');
+        console.log('最後のユーザー質問:', lastUserQuestion);
+        console.log('AI回答の長さ:', aiResponse?.length);
+        console.log('現在の分析データ:', analysisData ? '有り' : '無し');
+        console.log('選択された分析データ:', selectedAnalysisData ? `${selectedAnalysisData.length}件` : '無し');
+        
+        // おすすめ質問を生成（選択されたデータも含める）
+        console.log('generateDashboardSuggestedQuestions 呼び出し開始');
+        const suggestedQuestions = await generateDashboardSuggestedQuestions(lastUserQuestion, aiResponse, fieldData, analysisData, selectedAnalysisData);
+        console.log('generateDashboardSuggestedQuestions 呼び出し完了:', suggestedQuestions);
+        
+        if (suggestedQuestions && suggestedQuestions.length > 0) {
+            console.log('生成されたおすすめ質問:', suggestedQuestions);
+            console.log('showDashboardSuggestedQuestionsComponent 呼び出し開始');
+            showDashboardSuggestedQuestionsComponent(suggestedQuestions);
+            console.log('showDashboardSuggestedQuestionsComponent 呼び出し完了');
+        } else {
+            console.log('おすすめ質問の生成に失敗しました - suggestedQuestions:', suggestedQuestions);
+        }
+    } catch (error) {
+        console.error('Dashboard おすすめ質問の生成中にエラーが発生しました:', error);
+        console.error('エラースタック:', error.stack);
+    }
+}
+
+// Dashboard用おすすめ質問を生成する関数
+async function generateDashboardSuggestedQuestions(userQuestion, aiResponse, fieldData, analysisData, selectedAnalysisData = null) {
+    console.log('=== DEBUG: generateDashboardSuggestedQuestions 関数開始 ===');
+    
+    try {
+        // プロンプトを作成（選択されたデータも含める）
+        console.log('プロンプト作成開始');
+        const prompt = createDashboardSuggestedQuestionsPrompt(userQuestion, aiResponse, fieldData, analysisData, selectedAnalysisData);
+        console.log('プロンプト作成完了 - 長さ:', prompt.length);
+        
+        // Gemini APIを使用して質問を生成
+        console.log('Gemini API呼び出し開始');
+        const response = await fetchDashboardGeminiSuggestedQuestions(prompt);
+        console.log('Gemini API呼び出し完了:', response);
+        
+        return response;
+    } catch (error) {
+        console.error('Dashboard おすすめ質問生成エラー:', error);
+        console.error('エラースタック:', error.stack);
+        console.log('デフォルト質問生成にフォールバック');
+        const defaultQuestions = generateDefaultDashboardSuggestedQuestions(fieldData, analysisData);
+        console.log('デフォルト質問:', defaultQuestions);
+        return defaultQuestions;
+    }
+}
+
+// Dashboard用おすすめ質問生成プロンプトを作成
+function createDashboardSuggestedQuestionsPrompt(userQuestion, aiResponse, fieldData, analysisData, selectedAnalysisData = null) {
+    let prompt = `
+あなたは農業の専門家AIアシスタントです。ダッシュボードでの会話の流れを分析して、次に聞きたくなるであろう3つの質問を提案してください。
+
+## 直前の会話:
+ユーザーの質問: ${userQuestion || '初回質問'}
+AIの回答: ${aiResponse}
+
+## 現在の圃場データ:
+`;
+
+    // 圃場データがある場合は追加
+    if (fieldData) {
+        prompt += `
+- 圃場名: ${fieldData.name || '不明'}
+- 作物: ${fieldData.crop || '不明'}
+- メモ: ${fieldData.memo || 'なし'}
+`;
+    } else {
+        prompt += `- 選択されている圃場はありません\n`;
+    }
+
+    // 現在の分析データがある場合は追加
+    if (analysisData && analysisData.stats) {
+        const stats = analysisData.stats;
+        prompt += `
+## 最新の植生指標データ:
+- NDVI（植生指標）: ${stats.ndvi ? stats.ndvi.mean : '不明'}
+- NDMI（水分指標）: ${stats.ndmi ? stats.ndmi.mean : '不明'}
+- NDRE（栄養指標）: ${stats.ndre ? stats.ndre.mean : '不明'}
+`;
+    } else {
+        prompt += `\n## 最新の植生指標データ: まだ分析されていません\n`;
+    }
+
+    // 選択された分析データの詳細を追加
+    if (selectedAnalysisData && selectedAnalysisData.length > 0) {
+        prompt += `\n## 選択された過去の分析データ: ${selectedAnalysisData.length}件\n`;
+        
+        selectedAnalysisData.forEach((data, index) => {
+            const stats = data.analysis?.stats || data.stats;
+            const evaluation = data.analysis?.evaluation || data.evaluation;
+            prompt += `
+### 選択データ${index + 1}:
+- 圃場名: ${data.field?.name || '不明'}
+- 分析日: ${data.dateFormatted || data.date || '不明'}
+- NDVI: ${stats?.ndvi?.mean || '不明'}
+- NDMI: ${stats?.ndmi?.mean || '不明'}
+- NDRE: ${stats?.ndre?.mean || '不明'}
+- 健康状態: ${evaluation?.overall?.status || '不明'}
+`;
+        });
+    } else {
+        prompt += `\n## 選択された分析データ: なし\n`;
+    }
+
+    prompt += `
+## 回答要求:
+上記の情報を基に、農家が次に知りたくなるであろう実用的で具体的な質問を3つ提案してください。
+質問は以下の条件を満たしてください：
+1. 各質問は30文字以内で簡潔に
+2. 農業の実践に役立つ内容
+3. 現在のデータや会話の流れに関連している
+4. 初心者にも理解しやすい表現
+5. 複数の分析データが選択されている場合は、比較や時系列変化に関する質問も含める
+
+回答は以下のJSON形式で返してください：
+{
+  "questions": [
+    "質問1",
+    "質問2", 
+    "質問3"
+  ]
+}
+`;
+
+    return prompt;
+}
+
+// Dashboard用Gemini APIを使っておすすめ質問を取得
+async function fetchDashboardGeminiSuggestedQuestions(prompt) {
+    try {
+        // gemini-api.jsのgetGeminiAdvice関数を使用（チャットモード）
+        const chatData = {
+            type: 'suggested_questions',
+            message: prompt,
+            context: {
+                fieldData: getCurrentFieldData(),
+                analysisData: getLatestAnalysisData(),
+                selectedData: window.AiAssistantHistory ? window.AiAssistantHistory.getSelectedIds() : []
+            }
+        };
+        
+        const response = await window.getGeminiAdvice(null, chatData);
+        
+        if (response && response.success && response.chatResponse) {
+            // JSONレスポンスを解析
+            try {
+                const parsedResponse = JSON.parse(response.chatResponse);
+                if (parsedResponse.questions && Array.isArray(parsedResponse.questions)) {
+                    return parsedResponse.questions.slice(0, 3); // 最大3つ
+                }
+            } catch (parseError) {
+                console.warn('Dashboard JSON解析に失敗、デフォルト質問を使用:', parseError);
+            }
+        }
+        
+        return generateDefaultDashboardSuggestedQuestions(getCurrentFieldData(), getLatestAnalysisData());
+    } catch (error) {
+        console.error('Dashboard Gemini APIでおすすめ質問取得に失敗:', error);
+        return generateDefaultDashboardSuggestedQuestions(getCurrentFieldData(), getLatestAnalysisData());
+    }
+}
+
+// 選択された分析データを取得する関数
+function getSelectedAnalysisData() {
+    try {
+        // AiAssistantHistoryオブジェクトの存在確認
+        console.log('=== DEBUG: AiAssistantHistory チェック ===');
+        console.log('window.AiAssistantHistory:', typeof window.AiAssistantHistory);
+        console.log('AiAssistantHistory.getSelectedIds:', typeof window.AiAssistantHistory?.getSelectedIds);
+        
+        const selectedIds = window.AiAssistantHistory ? window.AiAssistantHistory.getSelectedIds() : [];
+        console.log('=== DEBUG: 選択された分析データ取得 ===');
+        console.log('選択されたID数:', selectedIds.length);
+        console.log('選択されたID:', selectedIds);
+        
+        // HTML要素の存在確認
+        const checkboxContainer = document.getElementById('aiHistoryCheckboxes');
+        const selectedCount = document.getElementById('selectedAnalysisCount');
+        console.log('チェックボックスコンテナ:', checkboxContainer ? '存在' : '不存在');
+        console.log('選択カウント要素:', selectedCount ? `存在(値: ${selectedCount.textContent})` : '不存在');
+        
+        if (selectedIds.length === 0) {
+            console.log('選択された分析データはありません');
+            return null;
+        }
+        
+        const selectedAnalysisDataList = [];
+        for (const id of selectedIds) {
+            const result = window.AnalysisStorage ? window.AnalysisStorage.getById(id) : null;
+            console.log(`ID ${id} の取得結果:`, result ? '成功' : '失敗');
+            if (result) {
+                selectedAnalysisDataList.push(result);
+                console.log(`  - 圃場名: ${result.field?.name}`);
+                console.log(`  - 分析日: ${result.dateFormatted}`);
+                console.log(`  - NDVI平均: ${result.analysis?.stats?.ndvi?.mean}`);
+                console.log(`  - データ構造:`, {
+                    analysis: result.analysis ? '有り' : '無し',
+                    stats: result.analysis?.stats ? '有り' : '無し',
+                    directStats: result.stats ? '有り' : '無し'
+                });
+            }
+        }
+        
+        console.log('取得できた分析データ数:', selectedAnalysisDataList.length);
+        return selectedAnalysisDataList.length > 0 ? selectedAnalysisDataList : null;
+    } catch (error) {
+        console.error('選択された分析データの取得でエラー:', error);
+        return null;
+    }
+}
+
+// Dashboard用デフォルトのおすすめ質問を生成
+function generateDefaultDashboardSuggestedQuestions(fieldData, analysisData) {
+    const defaultQuestions = [];
+    
+    // まず選択された分析データを確認
+    const selectedAnalysisData = getSelectedAnalysisData();
+    console.log('=== DEBUG: おすすめ質問生成 ===');
+    console.log('現在の分析データ:', analysisData ? '有り' : '無し');
+    console.log('選択された分析データ:', selectedAnalysisData ? `${selectedAnalysisData.length}件` : '無し');
+    
+    // 選択された分析データがある場合はそれを優先的に使用
+    let targetAnalysisData = null;
+    if (selectedAnalysisData && selectedAnalysisData.length > 0) {
+        // 最新の選択データを使用
+        const rawData = selectedAnalysisData[selectedAnalysisData.length - 1];
+        console.log('選択された分析データを使用:', rawData.field?.name);
+        console.log('選択されたデータの構造:', {
+            analysis: rawData.analysis ? '有り' : '無し',
+            stats: rawData.analysis?.stats ? '有り' : '無し',
+            directStats: rawData.stats ? '有り' : '無し'
+        });
+        
+        // 分析データのstatsは analysis.stats の下にある
+        if (rawData.analysis && rawData.analysis.stats) {
+            targetAnalysisData = rawData.analysis;
+        } else if (rawData.stats) {
+            // 直接statsがある場合
+            targetAnalysisData = rawData;
+        }
+    } else if (analysisData && analysisData.stats) {
+        // 選択データがない場合は現在の分析データを使用
+        targetAnalysisData = analysisData;
+        console.log('現在の分析データを使用');
+    }
+    
+    console.log('=== DEBUG: ターゲット分析データ確認 ===');
+    console.log('targetAnalysisData:', targetAnalysisData);
+    console.log('targetAnalysisData.stats:', targetAnalysisData?.stats);
+    
+    if (targetAnalysisData && targetAnalysisData.stats) {
+        const stats = targetAnalysisData.stats;
+        console.log('分析データの統計:', {
+            ndvi: stats.ndvi?.mean,
+            ndmi: stats.ndmi?.mean,
+            ndre: stats.ndre?.mean
+        });
+        
+        // 分析データがある場合の質問
+        if (stats.ndvi && stats.ndvi.mean < 0.5) {
+            defaultQuestions.push('植生改善の具体的な方法は？');
+        }
+        if (stats.ndmi && stats.ndmi.mean < 0.2) {
+            defaultQuestions.push('効果的な灌漑タイミングは？');
+        }
+        if (stats.ndre && stats.ndre.mean < 0.15) {
+            defaultQuestions.push('適切な施肥量を教えて');
+        }
+        
+        // 複数の分析データが選択されている場合の比較質問
+        if (selectedAnalysisData && selectedAnalysisData.length > 1) {
+            defaultQuestions.push('選択したデータの比較結果は？');
+            defaultQuestions.push('時系列での変化の傾向は？');
+        }
+        
+        // 足りない分をランダムで補完
+        const additionalQuestions = [
+            'この時期の管理ポイントは？',
+            '病害虫対策を教えて',
+            '来年の計画はどう立てる？',
+            '他の圃場との比較は？',
+            '収量への影響はどのくらい？'
+        ];
+        
+        while (defaultQuestions.length < 3 && additionalQuestions.length > 0) {
+            const randomIndex = Math.floor(Math.random() * additionalQuestions.length);
+            defaultQuestions.push(additionalQuestions.splice(randomIndex, 1)[0]);
+        }
+    } else {
+        console.log('分析データがないため、基本的な質問を生成');
+        // 分析データがない場合の基本的な質問
+        defaultQuestions.push(
+            '圃場の現在の状態は？',
+            '分析データの見方を教えて',
+            '今すぐできる改善策は？'
+        );
+    }
+    
+    console.log('生成されたデフォルト質問:', defaultQuestions);
+    return defaultQuestions.slice(0, 3);
+}
+
+// Dashboard用おすすめ質問コンポーネントを表示
+function showDashboardSuggestedQuestionsComponent(questions) {
+    console.log('=== DEBUG: showDashboardSuggestedQuestionsComponent 開始 ===');
+    console.log('questions:', questions);
+    
+    const chatMessages = document.getElementById('dashboardChatMessages');
+    console.log('dashboardChatMessages要素:', chatMessages);
+    
+    if (!chatMessages) {
+        console.error('dashboardChatMessages要素が見つかりません');
+        return;
+    }
+    
+    if (!questions || questions.length === 0) {
+        console.log('質問が空またはnullです');
+        return;
+    }
+    
+    console.log('おすすめ質問要素を作成中...');
+    const suggestedQuestionsElement = document.createElement('div');
+    suggestedQuestionsElement.className = 'suggested-questions-container';
+    
+    try {
+        suggestedQuestionsElement.innerHTML = `
+            <div class="suggested-questions-header">
+                <i class="fas fa-lightbulb text-yellow-500"></i>
+                <span class="suggested-questions-title">次のおすすめ質問</span>
+            </div>
+            <div class="suggested-questions-buttons">
+                ${questions.map((question, index) => `
+                    <button 
+                        class="suggested-question-btn" 
+                        onclick="handleDashboardSuggestedQuestionClick('${escapeHtml(question)}')"
+                        data-question="${escapeHtml(question)}"
+                    >
+                        ${escapeHtml(question)}
+                    </button>
+                `).join('')}
+            </div>
+        `;
+        
+        console.log('HTML生成完了、要素をDOMに追加中...');
+        chatMessages.appendChild(suggestedQuestionsElement);
+        console.log('おすすめ質問コンポーネントの表示完了');
+        
+    } catch (error) {
+        console.error('おすすめ質問コンポーネントの作成中にエラー:', error);
+        console.error('エラースタック:', error.stack);
+    }
+}
+
+// Dashboard用おすすめ質問ボタンクリック時の処理
+function handleDashboardSuggestedQuestionClick(question) {
+    const chatInput = document.getElementById('dashboardChatInput');
+    if (chatInput) {
+        // 質問をテキストエリアに入力
+        chatInput.value = question;
+        chatInput.focus();
+        
+        // オプション: 自動的に送信する場合
+        // handleDashboardChatSubmit();
+    }
+}
+
+// Dashboard用おすすめ質問のクリックハンドラをグローバルに公開
+window.handleDashboardSuggestedQuestionClick = handleDashboardSuggestedQuestionClick;
 
 // Dashboard Chat AI考え中メッセージを表示（一意のIDを返す）
 function showDashboardThinkingMessage() {
@@ -795,8 +1155,20 @@ function generateMockChatResponse(userMessage, fieldData, analysisData) {
 function formatMessageText(text) {
     if (!text) return '';
     
+    // 前後のダブルクォーテーションを除去
+    let cleanedText = text.toString().trim();
+    if (cleanedText.startsWith('"') && cleanedText.endsWith('"')) {
+        cleanedText = cleanedText.slice(1, -1);
+    }
+    
+    // \n を実際の改行に変換（HTMLエスケープ前に実行）
+    cleanedText = cleanedText.replace(/\\n/g, '\n');
+    
     // HTMLエスケープ
-    let formattedText = escapeHtml(text);
+    let formattedText = escapeHtml(cleanedText);
+    
+    // 改行を<br>タグに変換
+    formattedText = formattedText.replace(/\n/g, '<br>');
     
     // 見出し (##)
     formattedText = formattedText.replace(/^##\s+(.+)$/gm, '<h3 class="text-lg font-bold mt-2 mb-1">$1</h3>');
@@ -804,8 +1176,11 @@ function formatMessageText(text) {
     // 強調 (**)
     formattedText = formattedText.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     
-    // 箇条書き
-    formattedText = formattedText.replace(/^[*-]\s+(.+)$/gm, '<li class="ml-4">$1</li>');
+    // 箇条書き（改行後の処理として）
+    formattedText = formattedText.replace(/^[*\-]\s+(.+)$/gm, '<li class="ml-4">• $1</li>');
+    
+    // 連続するliタグをulでラップ
+    formattedText = formattedText.replace(/(<li[^>]*>.*?<\/li>(?:\s*<li[^>]*>.*?<\/li>)*)/g, '<ul class="space-y-1">$1</ul>');
     
     // 数値（緑色表示）
     formattedText = formattedText.replace(/(\b\d+\.\d+\b)/g, '<span class="text-green-600 font-medium">$1</span>');
@@ -820,6 +1195,11 @@ function cleanupAiResponse(response) {
     }
     
     let cleanResponse = response.trim();
+    
+    // 前後のダブルクォーテーションを除去
+    if (cleanResponse.startsWith('"') && cleanResponse.endsWith('"')) {
+        cleanResponse = cleanResponse.slice(1, -1);
+    }
     
     // JSON形式のレスポンスをチェック
     if (cleanResponse.startsWith('{') && cleanResponse.endsWith('}')) {
@@ -860,6 +1240,14 @@ function cleanupAiResponse(response) {
     
     // さらに、残っているJSON文字列やオブジェクト形式の文字列を除去
     cleanResponse = cleanResponse.replace(/^\{.*?\}$/s, '').trim();
+    
+    // 再度ダブルクォーテーション除去（抽出後）
+    if (cleanResponse.startsWith('"') && cleanResponse.endsWith('"')) {
+        cleanResponse = cleanResponse.slice(1, -1);
+    }
+    
+    // \n を実際の改行に変換
+    cleanResponse = cleanResponse.replace(/\\n/g, '\n');
     
     // 空の場合はフォールバックメッセージ
     if (!cleanResponse) {

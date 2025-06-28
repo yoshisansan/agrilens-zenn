@@ -1,0 +1,196 @@
+/* CSS変数定義 - 色とサイズの統一管理 */
+
+:root {
+    /* ===== カラーシステム ===== */
+    
+    /* プライマリカラー（メインブランドカラー） */
+    --color-primary-50: #f0fdf4;
+    --color-primary-100: #dcfce7;
+    --color-primary-200: #bbf7d0;
+    --color-primary-300: #86efac;
+    --color-primary-400: #4ade80;
+    --color-primary-500: #22c55e;  /* メインカラー */
+    --color-primary-600: #16a34a;
+    --color-primary-700: #15803d;  /* ヘッダーなどの濃いグリーン */
+    --color-primary-800: #166534;
+    --color-primary-900: #14532d;
+    
+    /* セカンダリカラー（アクセントカラー） */
+    --color-secondary-50: #eff6ff;
+    --color-secondary-100: #dbeafe;
+    --color-secondary-200: #bfdbfe;
+    --color-secondary-300: #93c5fd;
+    --color-secondary-400: #60a5fa;
+    --color-secondary-500: #3b82f6;  /* ブルー系メインカラー */
+    --color-secondary-600: #2563eb;
+    --color-secondary-700: #1d4ed8;
+    --color-secondary-800: #1e40af;
+    --color-secondary-900: #1e3a8a;
+    
+    /* グレースケール */
+    --color-gray-50: #f9fafb;
+    --color-gray-100: #f3f4f6;
+    --color-gray-200: #e5e7eb;
+    --color-gray-300: #d1d5db;
+    --color-gray-400: #9ca3af;
+    --color-gray-500: #6b7280;
+    --color-gray-600: #4b5563;
+    --color-gray-700: #374151;
+    --color-gray-800: #1f2937;
+    --color-gray-900: #111827;
+    
+    /* ステータスカラー */
+    --color-success-50: #f0fdf4;
+    --color-success-100: #dcfce7;
+    --color-success-500: #22c55e;
+    --color-success-600: #16a34a;
+    --color-success-700: #15803d;
+    
+    --color-warning-50: #fffbeb;
+    --color-warning-100: #fef3c7;
+    --color-warning-500: #f59e0b;
+    --color-warning-600: #d97706;
+    --color-warning-700: #b45309;
+    
+    --color-error-50: #fef2f2;
+    --color-error-100: #fee2e2;
+    --color-error-500: #ef4444;
+    --color-error-600: #dc2626;
+    --color-error-700: #b91c1c;
+    
+    --color-info-50: #eff6ff;
+    --color-info-100: #dbeafe;
+    --color-info-500: #3b82f6;
+    --color-info-600: #2563eb;
+    --color-info-700: #1d4ed8;
+    
+    /* ===== スペーシング ===== */
+    --spacing-xs: 0.25rem;    /* 4px */
+    --spacing-sm: 0.5rem;     /* 8px */
+    --spacing-md: 1rem;       /* 16px */
+    --spacing-lg: 1.5rem;     /* 24px */
+    --spacing-xl: 2rem;       /* 32px */
+    --spacing-2xl: 3rem;      /* 48px */
+    --spacing-3xl: 4rem;      /* 64px */
+    
+    /* ===== フォントサイズ ===== */
+    --font-size-xs: 0.75rem;    /* 12px */
+    --font-size-sm: 0.875rem;   /* 14px */
+    --font-size-base: 1rem;     /* 16px */
+    --font-size-lg: 1.125rem;   /* 18px */
+    --font-size-xl: 1.25rem;    /* 20px */
+    --font-size-2xl: 1.5rem;    /* 24px */
+    --font-size-3xl: 1.875rem;  /* 30px */
+    --font-size-4xl: 2.25rem;   /* 36px */
+    
+    /* ===== 行間 ===== */
+    --line-height-tight: 1.25;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.75;
+    
+    /* ===== ボーダー半径 ===== */
+    --border-radius-sm: 0.125rem;  /* 2px */
+    --border-radius-md: 0.375rem;  /* 6px */
+    --border-radius-lg: 0.5rem;    /* 8px */
+    --border-radius-xl: 0.75rem;   /* 12px */
+    --border-radius-full: 9999px;  /* 完全な円形 */
+    
+    /* ===== シャドウ ===== */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    
+    /* ===== トランジション ===== */
+    --transition-fast: 150ms ease-in-out;
+    --transition-normal: 300ms ease-in-out;
+    --transition-slow: 500ms ease-in-out;
+    
+    /* ===== Z-index ===== */
+    --z-dropdown: 1000;
+    --z-sticky: 1020;
+    --z-fixed: 1030;
+    --z-modal-backdrop: 1040;
+    --z-modal: 1050;
+    --z-popover: 1060;
+    --z-tooltip: 1070;
+    --z-toast: 1080;
+    
+    /* ===== 固有コンポーネントカラー ===== */
+    
+    /* ヘッダー */
+    --header-bg: var(--color-primary-700);
+    --header-text: white;
+    
+    /* サイドバー */
+    --sidebar-bg: white;
+    --sidebar-border: var(--color-gray-200);
+    --sidebar-text: var(--color-gray-700);
+    --sidebar-text-hover: var(--color-primary-600);
+    
+    /* カード */
+    --card-bg: white;
+    --card-border: var(--color-gray-200);
+    --card-shadow: var(--shadow-md);
+    
+    /* ボタン */
+    --btn-primary-bg: var(--color-primary-600);
+    --btn-primary-hover: var(--color-primary-700);
+    --btn-primary-text: white;
+    
+    --btn-secondary-bg: var(--color-secondary-600);
+    --btn-secondary-hover: var(--color-secondary-700);
+    --btn-secondary-text: white;
+    
+    --btn-danger-bg: var(--color-error-600);
+    --btn-danger-hover: var(--color-error-700);
+    --btn-danger-text: white;
+    
+    /* フォーム */
+    --input-bg: white;
+    --input-border: var(--color-gray-300);
+    --input-border-focus: var(--color-primary-500);
+    --input-text: var(--color-gray-900);
+    --input-placeholder: var(--color-gray-400);
+    
+    /* アラート・通知 */
+    --alert-success-bg: var(--color-success-50);
+    --alert-success-border: var(--color-success-200);
+    --alert-success-text: var(--color-success-800);
+    
+    --alert-warning-bg: var(--color-warning-50);
+    --alert-warning-border: var(--color-warning-200);
+    --alert-warning-text: var(--color-warning-800);
+    
+    --alert-error-bg: var(--color-error-50);
+    --alert-error-border: var(--color-error-200);
+    --alert-error-text: var(--color-error-800);
+    
+    --alert-info-bg: var(--color-info-50);
+    --alert-info-border: var(--color-info-200);
+    --alert-info-text: var(--color-info-800);
+    
+    /* ===== レスポンシブブレークポイント ===== */
+    --breakpoint-sm: 640px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 1024px;
+    --breakpoint-xl: 1280px;
+    --breakpoint-2xl: 1536px;
+}
+
+/* ダークモード対応（将来の拡張用） */
+@media (prefers-color-scheme: dark) {
+    :root {
+        /* ダークモード時の色定義はここに追加 */
+        --color-gray-50: #1f2937;
+        --color-gray-100: #374151;
+        --color-gray-200: #4b5563;
+        --color-gray-300: #6b7280;
+        --color-gray-400: #9ca3af;
+        --color-gray-500: #d1d5db;
+        --color-gray-600: #e5e7eb;
+        --color-gray-700: #f3f4f6;
+        --color-gray-800: #f9fafb;
+        --color-gray-900: #ffffff;
+    }
+}

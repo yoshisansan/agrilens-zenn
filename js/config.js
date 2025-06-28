@@ -97,5 +97,82 @@ const CONFIG = {
         MAX_DIRECTORIES: 10, // ユーザーあたりの最大リスト数
         STORAGE_KEY: 'hatake_health_directories', // ローカルストレージのキー
         DEFAULT_NAME: '圃場1' // デフォルトリスト名
+    },
+    
+    // APIとタイムアウト設定
+    API: {
+        GEMINI_TIMEOUT: 30000, // Gemini APIタイムアウト（ms）
+        RETRY_COUNT: 3, // リトライ回数
+        RETRY_DELAY: 1000, // リトライ間隔（ms）
+        // Vertex AI設定
+        VERTEX_AI: {
+            DEFAULT_REGION: 'asia-northeast1', // Tokyo region
+            DEFAULT_PROJECT_ID: '', // サーバーから取得
+            AVAILABLE_MODELS: {
+                GEMINI: ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-thinking-exp-01-21'],
+                GEMMA: ['gemma-2-9b-it', 'gemma-2-27b-it']
+            }
+        },
+        // APIプロバイダー設定（デフォルト値）
+        PROVIDER: 'gemini-direct', // vertex | gemini-direct
+        DEFAULT_MODEL: 'gemini-1.5-flash'
+    },
+    
+    // UI設定
+    UI: {
+        PANEL_ANIMATION_DELAY: 50, // パネル表示遅延（ms）
+        PROGRESS_UPDATE_DELAY: 100, // プログレスバー更新間隔（ms）
+        LOADING_SPINNER_DELAY: 200, // ローディング表示遅延（ms）
+        DEFAULT_DECIMAL_PLACES: 3 // デフォルト小数点以下桁数
+    },
+    
+    // デフォルト値設定
+    DEFAULTS: {
+        NDVI_VALUE: 0.65,
+        NDMI_VALUE: 0.42,
+        NDRE_VALUE: 0.38,
+        CROP_TYPE: '不明'
     }
-}; 
+};
+
+// 動的設定管理
+class ConfigManager {
+    constructor() {
+        this.serverConfig = null;
+        this.initialized = false;
+    }
+
+    async initialize() {
+        if (this.initialized) return;
+        
+        try {
+            const response = await fetch('/api/server-info');
+            const data = await response.json();
+            this.serverConfig = data.aiConfig;
+            
+            // サーバー設定で既存の設定を上書き
+            if (this.serverConfig) {
+                CONFIG.API.PROVIDER = this.serverConfig.provider;
+                CONFIG.API.DEFAULT_MODEL = this.serverConfig.defaultModel;
+                CONFIG.API.VERTEX_AI.DEFAULT_REGION = this.serverConfig.region;
+            }
+            
+            this.initialized = true;
+            console.log('Config initialized with server settings:', this.serverConfig);
+        } catch (error) {
+            console.warn('Failed to load server config, using defaults:', error);
+            this.initialized = true;
+        }
+    }
+
+    getServerConfig() {
+        return this.serverConfig;
+    }
+
+    hasVertexAI() {
+        return this.serverConfig ? this.serverConfig.hasVertexAI : false;
+    }
+}
+
+// グローバルインスタンス
+window.configManager = new ConfigManager(); 

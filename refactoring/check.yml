@@ -3,10 +3,12 @@
 # Project: agrilens-zenn
 # Purpose: ハッカソン提出に向けたコード品質の向上と、継続的な品質維持
 # 特記事項: HTML/JS/CSSとGemini API連携に特化した項目を強化
+# 検診後はログを ./log/ へファイルを作成して記録する。日付_にちぢ_code_inspection.log というファイル名で保存する。
+# 例：20250626_101607_code_inspection.md
 
 metadata:
   last_checked: "2025-06-26"
-  checked_by: "your_name"
+  checked_by: "akifumi"
   next_check_date: ""
   overall_score: 0  # 100点満点
 
@@ -132,3 +134,4 @@ scoring:
 notes: |
   - 定期検診は、タイミングを決めて実施する。
   - スコアは客観的な指標として活用し、低い項目から優先的に改善に取り組む。
+  - 検診後はログを ./log/ へファイルを作成して記録する。日付_にちぢ_code_inspection.log というファイル名で保存する。

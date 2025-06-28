@@ -3,12 +3,27 @@
 // プロンプトテンプレートは直接関数内に埋め込むため、この変数は不要になりました。
 
 /**
+ * 現在のAI設定を取得する関数
+ * @returns {Object} AI設定オブジェクト
+ */
+function getAiConfig() {
+    return {
+        provider: 'vertex', // または 'gemini-direct'
+        defaultModel: 'gemini-2.0-flash-thinking-exp-01-21',
+        availableModels: {
+            gemini: ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-thinking-exp-01-21'],
+            gemma: ['gemma-2-9b-it', 'gemma-2-27b-it']
+        }
+    };
+}
+
+/**
  * Gemini APIキーを取得する関数
  * 環境変数から取得し、なければローカルストレージを確認
  * @returns {string} APIキーまたは特別フラグ
  */
 function getGeminiApiKey() {
-    console.log('サーバーサイドでのAPI呼び出しを使用するモードで動作します');
+    console.log('サーバーサイドでのAI API呼び出しを使用するモードで動作します');
     
     // サーバーサイドの実装に合わせて、必ずサーバーにリクエストを送るようにする
     return 'USE_SERVER';
@@ -293,33 +308,43 @@ async function getGeminiAdvice(analysisData, fieldData) {
  * @param {string} prompt - プロンプト内容
  * @returns {Promise<string>} - Geminiからの回答またはダミー応答 (JSON文字列)
  */
-async function fetchGeminiResponse(apiKey, prompt) {
-    // DEMO_MODEの場合はダミーレスポンスを生成する関数
-    function generateDummyResponse(prompt) {
-        console.log('ダミー応答を生成します。');
-        // プロンプトから一部情報を抽出してダミーレスポンスに使用
-        let cropType = '不明';
-        let ndviValue = '0.65';
-        let ndmiValue = '0.42';
-        let ndreValue = '0.38';
+// ダミーレスポンス生成
+function generateDummyResponse(prompt) {
+    console.log('ダミー応答を生成します。');
+    
+    const extractedData = extractDataFromPrompt(prompt);
+    return buildDummyResponseJSON(extractedData);
+}
+
+// プロンプトからデータ抽出
+function extractDataFromPrompt(prompt) {
+    const config = window.ModuleManager?.get('config') || window.CONFIG;
+    const defaults = config?.DEFAULTS || {};
+    let cropType = defaults.CROP_TYPE || '不明';
+    let ndviValue = String(defaults.NDVI_VALUE || 0.65);
+    let ndmiValue = String(defaults.NDMI_VALUE || 0.42);
+    let ndreValue = String(defaults.NDRE_VALUE || 0.38);
+    
+    try {
+        const ndviMatch = prompt.match(/NDVI[^:]*:[^\d]*(\d+\.\d+|\d+)/i);
+        const ndmiMatch = prompt.match(/NDMI[^:]*:[^\d]*(\d+\.\d+|\d+)/i);
+        const ndreMatch = prompt.match(/NDRE[^:]*:[^\d]*(\d+\.\d+|\d+)/i);
+        const cropMatch = prompt.match(/作物[^:]*:[^\n]*(\S+)/i);
         
-        try {
-            // プロンプトから値を抽出する簡易的な方法
-            const ndviMatch = prompt.match(/NDVI[^:]*:[^\d]*(\d+\.\d+|\d+)/i);
-            const ndmiMatch = prompt.match(/NDMI[^:]*:[^\d]*(\d+\.\d+|\d+)/i);
-            const ndreMatch = prompt.match(/NDRE[^:]*:[^\d]*(\d+\.\d+|\d+)/i);
-            const cropMatch = prompt.match(/作物[^:]*:[^\n]*(\S+)/i);
-            
-            if (ndviMatch && ndviMatch[1]) ndviValue = ndviMatch[1];
-            if (ndmiMatch && ndmiMatch[1]) ndmiValue = ndmiMatch[1];
-            if (ndreMatch && ndreMatch[1]) ndreValue = ndreMatch[1];
-            if (cropMatch && cropMatch[1]) cropType = cropMatch[1];
-        } catch (e) {
-            console.warn('ダミーデータ生成中にエラーが発生しました:', e);
-        }
-        
-        // ダミーレスポンスを返す
-        return `{
+        if (ndviMatch && ndviMatch[1]) ndviValue = ndviMatch[1];
+        if (ndmiMatch && ndmiMatch[1]) ndmiValue = ndmiMatch[1];
+        if (ndreMatch && ndreMatch[1]) ndreValue = ndreMatch[1];
+        if (cropMatch && cropMatch[1]) cropType = cropMatch[1];
+    } catch (e) {
+        console.warn('ダミーデータ生成中にエラーが発生しました:', e);
+    }
+    
+    return { cropType, ndviValue, ndmiValue, ndreValue };
+}
+
+// ダミーJSONレスポンス構築
+function buildDummyResponseJSON({ cropType, ndviValue, ndmiValue, ndreValue }) {
+    return `{
   "重要な知見のまとめ": "分析地域のNDVI値は${ndviValue}で、健康な植生状態を示しています。NDMI値は${ndmiValue}で、適切な水分ストレスレベルです。NDRE値は${ndreValue}で、機能的な計測範囲内です。全体的に圃場は良好な状態です。",
   "詳細な評価": {
     "NDVI": {
@@ -346,68 +371,108 @@ async function fetchGeminiResponse(apiKey, prompt) {
     "近隣地域の同種作物の分析データを比較参照する（可能であれば）"
   ]
 }`;
-    }
-    
+}
+
+async function fetchGeminiResponse(apiKey, prompt) {
     // デモモードの場合はダミーレスポンスを返す
     if (apiKey === 'DEMO_MODE') {
         console.log('デモモードで実行します。');
         return generateDummyResponse(prompt);
     }
     
-    // 特別フラグの場合はサーバーにリクエストを送るが、失敗した場合はダミーデータを返す
-    // DEMO_MODEとUSE_SERVER以外の場合も全てサーバーにリクエストを送る
+    // サーバーサイドAPIで処理
+    return processServerSideGeminiRequest(prompt);
+}
 
-    // サーバーサイドのAPIエンドポイントを使用するモード
+// サーバーサイドGeminiリクエスト処理
+async function processServerSideGeminiRequest(prompt) {
     console.log('サーバーサイドのGemini APIエンドポイントにリクエスト送信を試みます');
     console.log('プロンプト:', prompt.substring(0, 100) + '...');
 
     try {
-        // サーバーにリクエストを送信する試み
-        const fetchPromise = fetch('/api/gemini-advice', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ prompt })
-        });
-        
-        // タイムアウト付きのFetchを作成（30秒に延長）
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('リクエストがタイムアウトしました')), 30000); // 30秒タイムアウト
-        });
-        
-        // 先に完了したほうを取る
-        const response = await Promise.race([fetchPromise, timeoutPromise]);
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Gemini APIサーバーエラー:', response.status, errorData);
-            
-            // APIキー未設定やサーバーエラーの場合、詳細をログに出力してダミーデータを返す
-            if (response.status === 500 && errorData.error === 'APIキー未設定') {
-                console.warn('GEMINI_API_KEYが設定されていません。ダミーデータを使用します。');
-            } else {
-                console.warn('Gemini APIエラーが発生しました。ダミーデータを使用します。エラー詳細:', errorData);
-            }
-            
-            return generateDummyResponse(prompt);
-        }
-        
-        const responseData = await response.json();
-        console.log('サーバーからのレスポンス:', responseData);
-        
-        // サーバーからのレスポンスを確認
-        if (responseData.success && responseData.result) {
-            console.log('✅ Gemini APIから実際のレスポンスを取得しました:', responseData.result.substring(0, 100) + '...');
-            return responseData.result;
-        } else {
-            console.warn('⚠️ 不正なサーバーレスポンス形式。ダミーデータを使用します:', responseData);
-            return generateDummyResponse(prompt);
-        }
+        const response = await makeGeminiApiRequest(prompt);
+        return handleGeminiApiResponse(response, prompt);
     } catch (error) {
         console.error('❌ fetchGeminiResponse内でエラーが発生。ダミーデータを使用します:', error.message);
         return generateDummyResponse(prompt);
     }
+}
+
+// AI APIリクエスト実行（統合エンドポイント使用）
+async function makeGeminiApiRequest(prompt, modelName = null) {
+    const aiConfig = getAiConfig();
+    const selectedModel = modelName || aiConfig.defaultModel;
+    
+    const fetchPromise = fetch('/api/ai-advice', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+            prompt,
+            model: selectedModel
+        })
+    });
+    
+    const timeoutPromise = new Promise((_, reject) => {
+        const config = window.ModuleManager?.get('config') || window.CONFIG;
+        const timeout = config?.API?.GEMINI_TIMEOUT || 30000;
+        setTimeout(() => reject(new Error('リクエストがタイムアウトしました')), timeout);
+    });
+    
+    return Promise.race([fetchPromise, timeoutPromise]);
+}
+
+// Gemini APIレスポンス処理
+async function handleGeminiApiResponse(response, prompt) {
+    if (!response.ok) {
+        return handleGeminiApiError(response, prompt);
+    }
+    
+    const responseData = await response.json();
+    console.log('サーバーからのレスポンス:', responseData);
+    
+    if (responseData.success && responseData.result) {
+        console.log('✅ Gemini APIから実際のレスポンスを取得しました:', responseData.result.substring(0, 100) + '...');
+        return responseData.result;
+    } else {
+        console.warn('⚠️ 不正なサーバーレスポンス形式。ダミーデータを使用します:', responseData);
+        return generateDummyResponse(prompt);
+    }
+}
+
+// Gemini APIエラー処理
+async function handleGeminiApiError(response, prompt) {
+    const errorHandler = window.ModuleManager?.get('errorHandler');
+    
+    try {
+        const errorData = await response.json();
+        
+        if (errorHandler) {
+            errorHandler.handleApiError(response, {
+                context: 'gemini_api',
+                prompt: prompt.substring(0, 100) + '...',
+                errorData
+            });
+        } else {
+            console.error('Gemini APIサーバーエラー:', response.status, errorData);
+        }
+        
+        if (response.status === 500 && errorData.error === 'APIキー未設定') {
+            console.warn('GEMINI_API_KEYが設定されていません。ダミーデータを使用します。');
+        } else {
+            console.warn('Gemini APIエラーが発生しました。ダミーデータを使用します。エラー詳細:', errorData);
+        }
+    } catch (parseError) {
+        if (errorHandler) {
+            errorHandler.logError(parseError, {
+                context: 'gemini_api_error_parsing',
+                originalStatus: response.status
+            });
+        }
+    }
+    
+    return generateDummyResponse(prompt);
 }
 
 /**
@@ -429,6 +494,12 @@ async function getChatResponse(analysisData, chatData) {
             error: "APIキー未設定",
             message: "Gemini APIキーが設定されていません。設定画面から登録してください。"
         };
+    }
+    
+    // おすすめ質問タイプの場合の特別処理
+    if (chatData.type === 'suggested_questions') {
+        console.log('おすすめ質問生成モード:', chatData.message.substring(0, 100) + '...');
+        return await generateSuggestedQuestionsResponse(chatData.message);
     }
     
     // チャット用プロンプトを作成
@@ -599,6 +670,105 @@ ${selectedDetails.map((detail, index) => `
         return { 
             error: error.message,
             chatResponse: "エラーが発生しました: " + error.message 
+        };
+    }
+}
+
+// おすすめ質問生成専用の関数
+async function generateSuggestedQuestionsResponse(prompt) {
+    try {
+        // おすすめ質問生成にはGemma3（gemma-2-27b-it）を使用
+        const apiKey = getGeminiApiKey();
+        
+        // JSON形式のレスポンスを明確に要求するプロンプトを追加
+        const enhancedPrompt = prompt + `
+
+IMPORTANT: あなたは必ず以下のJSON形式で回答してください。他の形式は一切使用しないでください：
+
+{
+  "questions": [
+    "質問1のテキスト",
+    "質問2のテキスト", 
+    "質問3のテキスト"
+  ]
+}
+
+JSON以外のテキストや説明は一切含めず、上記のJSON形式のみで回答してください。`;
+
+        console.log('おすすめ質問生成用プロンプト送信中（Gemma3使用）...');
+        // おすすめ質問生成にはGemma3モデル（gemma-2-27b-it）を明示的に指定
+        const responseText = await makeGeminiApiRequest(enhancedPrompt, 'gemma-2-27b-it');
+        
+        if (responseText && typeof responseText === 'string') {
+            // JSON レスポンスを解析
+            try {
+                console.log('おすすめ質問レスポンス（最初の500文字）:', responseText.substring(0, 500));
+                
+                // JSONブロックを抽出
+                let jsonText = responseText.trim();
+                
+                // コードブロック（```json ... ```）から JSON を抽出
+                const jsonMatch = jsonText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+                if (jsonMatch) {
+                    jsonText = jsonMatch[1];
+                    console.log('コードブロックからJSONを抽出しました');
+                }
+                
+                // 最初と最後の中括弧の間を抽出
+                const startBrace = jsonText.indexOf('{');
+                const endBrace = jsonText.lastIndexOf('}');
+                if (startBrace !== -1 && endBrace !== -1 && endBrace > startBrace) {
+                    jsonText = jsonText.substring(startBrace, endBrace + 1);
+                }
+                
+                const parsedResponse = JSON.parse(jsonText);
+                console.log('おすすめ質問のJSONパース成功:', parsedResponse);
+                
+                if (parsedResponse.questions && Array.isArray(parsedResponse.questions)) {
+                    return { 
+                        chatResponse: JSON.stringify(parsedResponse),
+                        success: true 
+                    };
+                } else {
+                    console.warn('questionsフィールドが見つからないかarray形式ではありません');
+                    throw new Error('Invalid JSON structure');
+                }
+            } catch (parseError) {
+                console.error('おすすめ質問JSONパースエラー:', parseError);
+                console.log('パース失敗時の生レスポンス:', responseText);
+                
+                // デフォルトの質問を返す
+                const defaultQuestions = {
+                    "questions": [
+                        "この圃場の現在の状態は？",
+                        "改善できる点はありますか？",
+                        "次に何をすれば良いですか？"
+                    ]
+                };
+                
+                return {
+                    chatResponse: JSON.stringify(defaultQuestions),
+                    success: true
+                };
+            }
+        } else {
+            throw new Error('Invalid response format');
+        }
+    } catch (error) {
+        console.error('おすすめ質問生成エラー:', error);
+        
+        // エラー時のデフォルト応答
+        const defaultQuestions = {
+            "questions": [
+                "この圃場の状態を詳しく教えて",
+                "改善方法を教えてください",
+                "次のステップは何ですか？"
+            ]
+        };
+        
+        return {
+            chatResponse: JSON.stringify(defaultQuestions),
+            success: true
         };
     }
 }

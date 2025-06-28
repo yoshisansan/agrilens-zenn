@@ -8,13 +8,14 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/variables.css">
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/map.css">
     <link rel="stylesheet" href="css/ai-chat.css">
     <style>
         #map { height: 500px; }
         .ndvi-legend {
-            background: linear-gradient(to right, #d01c11, #f1b543, #4dac26); /* GEEのデフォルトNDVIパレットに近づける */
+            background: linear-gradient(to right, var(--color-error-600), var(--color-warning-500), var(--color-success-600));
         }
         /* Typing animation for dashboard chat */
         .typing-dot {
@@ -113,7 +114,7 @@
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center space-x-2">
                 <img src="assets/logo.png" alt="AgriLens Logo" class="h-8 w-auto">
-                <h1 class="text-xl font-bold">AgriLens テスト版</h1>
+                <h1 class="text-xl font-bold">AgriLens デモ版</h1>
             </div>
             <div class="flex items-center space-x-4">
                 <button id="sidebarToggle" class="md:hidden text-white">
@@ -130,9 +131,9 @@
     <!-- AI Chat Container (fixed position) -->
     <div id="ai-chat-container">
         <!-- Chat Toggle Button -->
-        <button id="chat-toggle-btn" class="z-50">
+        <!-- <button id="chat-toggle-btn" class="z-50">
             <i class="fas fa-comment-dots"></i>
-        </button>
+        </button> -->
         
         <!-- Chat Panel (initially hidden) -->
         <div id="ai-chat-panel" class="hidden">
@@ -386,7 +387,7 @@
                     </div>
                 </div>
                 <p id="instructionText" class="text-sm text-gray-500 mt-2">
-                    <i class="fas fa-info-circle mr-1"></i> マップ左側の描画ツール <i class="fa fa-lg fa-draw-polygon"></i> または <i class="fa fa-lg fa-vector-square"></i> を使って分析したい圃場の範囲を選択してください。
+                    <i class="fas fa-info-circle mr-1"></i> マップ左側の描画ツールを使って分析したい圃場の範囲を選択してください。
                 </p>
             </div>
 
@@ -624,20 +625,23 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="js/config.js"></script>
-    <script src="js/vegetation-indices.js"></script>
-    <script src="js/fields.js"></script>
-    <script src="js/map.js"></script>
-    <script src="js/modal.js"></script>
-    <script src="js/sidebar.js"></script>
-    <script src="js/analysis-storage.js"></script>
-    <script src="js/analysis.js"></script>
+    <script src="js/modules/module-manager.js"></script>
+    <script src="js/modules/error-handler.js"></script>
+    <script src="js/modules/ai-model-selector.js"></script>
     <script src="js/validation.js"></script>
-    <script src="js/gemini-api.js"></script>
+    <script src="js/fields.js"></script>
+    <script src="js/vegetation-indices.js"></script>
+    <script src="js/analysis-storage.js"></script>
     <script src="js/data-initializer.js"></script>
+    <script src="js/analysis.js"></script>
+    <script src="js/map.js"></script>
     <script src="js/ui.js"></script>
-    <script src="js/ai-chat.js"></script>
-    <script src="js/ai-assistant-history.js"></script>
+    <script src="js/sidebar.js"></script>
+    <script src="js/modal.js"></script>
+    <script src="js/gemini-api.js"></script>
     <script src="js/ai-assistant.js"></script>
+    <script src="js/ai-assistant-history.js"></script>
+    <script src="js/ai-chat.js"></script>
     <script src="js/data-exporter.js"></script>
     <script src="js/main.js"></script>
     <!-- 描画案内モーダル -->

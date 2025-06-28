@@ -189,4 +189,81 @@
     #chat-toggle-btn {
         right: 10px;
     }
+}
+
+/* おすすめ質問コンポーネントのスタイル */
+.suggested-questions-container {
+    margin: 10px 0;
+    padding: 12px;
+    background-color: #fef7e6;
+    border: 1px solid #fbbf24;
+    border-radius: 8px;
+    animation: fadeIn 0.3s ease;
+}
+
+.suggested-questions-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.suggested-questions-title {
+    margin-left: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #92400e;
+}
+
+.suggested-questions-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.suggested-question-btn {
+    background-color: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 0.8rem;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1.4;
+}
+
+.suggested-question-btn:hover {
+    background-color: #f3f4f6;
+    border-color: #9ca3af;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.suggested-question-btn:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.suggested-question-btn:focus {
+    outline: none;
+    border-color: #4b7e4b;
+    box-shadow: 0 0 0 2px rgba(75, 126, 75, 0.2);
+}
+
+/* おすすめ質問コンポーネントのレスポンシブ調整 */
+@media (max-width: 480px) {
+    .suggested-questions-container {
+        margin: 8px 0;
+        padding: 10px;
+    }
+    
+    .suggested-question-btn {
+        font-size: 0.75rem;
+        padding: 6px 10px;
+    }
+    
+    .suggested-questions-title {
+        font-size: 0.8rem;
+    }
 } 

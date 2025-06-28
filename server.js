@@ -11,7 +11,12 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // ミドルウェアの設定
-app.use(cors());
+app.use(cors({
+    origin: process.env.NODE_ENV === 'production' 
+        ? [process.env.PRODUCTION_URL, /\.run\.app$/] 
+        : true,
+    credentials: true
+}));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '.'))); // 静的ファイルを提供
 app.use(session({
@@ -24,17 +29,18 @@ app.use(session({
 const oauth2Client = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/auth/callback'
+    process.env.GOOGLE_REDIRECT_URI || `${process.env.NODE_ENV === 'production' ? 'https' : 'http'}://${process.env.HOST || 'localhost:3000'}/auth/callback`
 );
 
 // 環境変数の検証
 const hasFileAuth = process.env.GOOGLE_PRIVATE_KEY_PATH;
 const hasEnvAuth = process.env.GOOGLE_PRIVATE_KEY && process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PROJECT_ID;
 
-if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    console.log('警告: OAuth2認証に必要な環境変数が設定されていません。');
-    console.log('GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET が必要です。');
-}
+// OAuth2認証は任意のため警告を削除
+// if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+//     console.log('警告: OAuth2認証に必要な環境変数が設定されていません。');
+//     console.log('GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET が必要です。');
+// }
 
 if (!hasFileAuth && !hasEnvAuth) {
     console.log('警告: Earth Engine認証に必要な環境変数が設定されていません。');
@@ -543,7 +549,199 @@ app.get('/', (req, res) => {
 
 // Gemini APIをサーバーサイドで呼び出し、クライアントに結果だけを返す安全な方法
 
-// Gemini APIへのリクエストを処理するエンドポイント
+// APIプロバイダーの設定読み込み
+const API_PROVIDER = process.env.AI_API_PROVIDER || 'gemini-direct';
+const AI_MODEL = process.env.AI_MODEL || 'gemini-1.5-flash';
+const GOOGLE_PROJECT_ID = process.env.GOOGLE_PROJECT_ID;
+const GOOGLE_CLOUD_REGION = process.env.GOOGLE_CLOUD_REGION || 'asia-northeast1'; // Tokyo region
+
+// サービスアカウント認証情報を環境変数から構成
+const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY;
+const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL;
+const GOOGLE_PRIVATE_KEY_ID = process.env.GOOGLE_PRIVATE_KEY_ID;
+
+// Vertex AI用のインポート（npmインストール後有効になる）
+let VertexAI;
+try {
+  VertexAI = require('@google-cloud/vertexai');
+} catch (error) {
+  console.warn('Vertex AI SDKが見つかりません。npm install @google-cloud/vertexai を実行してください');
+}
+
+// 統合されたAI APIエンドポイント
+app.post('/api/ai-advice', async (req, res) => {
+  const fetch = await import('node-fetch').then(module => module.default);
+  
+  try {
+    const { prompt, model } = req.body;
+    if (!prompt) {
+      return res.status(400).json({ error: "プロンプトが必要です" });
+    }
+
+    const selectedModel = model || AI_MODEL;
+    console.log(`AI APIリクエスト - Provider: ${API_PROVIDER}, Model: ${selectedModel}`);
+
+    let result;
+    
+    if (API_PROVIDER === 'vertex' && VertexAI) {
+      result = await handleVertexAIRequest(prompt, selectedModel);
+    } else {
+      // フォールバック: 従来のGemini APIを使用
+      result = await handleDirectGeminiRequest(prompt, selectedModel, fetch);
+    }
+
+    res.json({ success: true, result });
+  } catch (error) {
+    console.error('AI APIリクエストエラー:', error);
+    res.status(500).json({ error: "サーバーエラー", message: error.message });
+  }
+});
+
+// Vertex AI経由でのリクエスト処理
+async function handleVertexAIRequest(prompt, modelName) {
+  if (!GOOGLE_PROJECT_ID) {
+    throw new Error('GOOGLE_PROJECT_IDが設定されていません');
+  }
+
+  // 環境変数からサービスアカウント情報を構成
+  if (!GOOGLE_PRIVATE_KEY || !GOOGLE_CLIENT_EMAIL || !GOOGLE_PRIVATE_KEY_ID) {
+    throw new Error('サービスアカウント情報（GOOGLE_PRIVATE_KEY, GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY_ID）が設定されていません');
+  }
+
+  // サービスアカウントキーオブジェクトを構成
+  const serviceAccountKey = {
+    type: 'service_account',
+    project_id: GOOGLE_PROJECT_ID,
+    private_key_id: GOOGLE_PRIVATE_KEY_ID,
+    private_key: GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'), // 改行文字の変換
+    client_email: GOOGLE_CLIENT_EMAIL,
+    auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+    token_uri: 'https://oauth2.googleapis.com/token',
+    auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+    client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(GOOGLE_CLIENT_EMAIL)}`
+  };
+
+  const vertexAI = new VertexAI.VertexAI({
+    project: GOOGLE_PROJECT_ID,
+    location: GOOGLE_CLOUD_REGION,
+    googleAuthOptions: {
+      credentials: serviceAccountKey
+    }
+  });
+
+  // モデルタイプによる分岐
+  if (modelName.startsWith('gemma')) {
+    return handleGemmaRequest(vertexAI, prompt, modelName);
+  } else {
+    return handleGeminiVertexRequest(vertexAI, prompt, modelName);
+  }
+}
+
+// Vertex AI経由でのGeminiリクエスト
+async function handleGeminiVertexRequest(vertexAI, prompt, modelName) {
+  const model = vertexAI.preview.getGenerativeModel({
+    model: modelName,
+    generationConfig: {
+      maxOutputTokens: 8192,
+      temperature: 0.3,
+      topP: 0.8,
+      topK: 40,
+    },
+  });
+
+  // プロンプトがJSON形式を要求しているかチェック
+  const isJsonRequest = prompt.includes('JSON') || prompt.includes('JSONスキーマ');
+  
+  const request = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+  };
+
+  if (isJsonRequest) {
+    request.generationConfig = {
+      ...request.generationConfig,
+      responseMimeType: "application/json"
+    };
+  }
+
+  const result = await model.generateContent(request);
+  const response = await result.response;
+  return response.candidates[0].content.parts[0].text;
+}
+
+// Vertex AI経由でのGemmaリクエスト
+async function handleGemmaRequest(vertexAI, prompt, modelName) {
+  const model = vertexAI.preview.getGenerativeModel({
+    model: modelName,
+    generationConfig: {
+      maxOutputTokens: 8192,
+      temperature: 0.3,
+      topP: 0.8,
+      topK: 40,
+    },
+  });
+
+  const result = await model.generateContent({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+  });
+
+  const response = await result.response;
+  return response.candidates[0].content.parts[0].text;
+}
+
+// 従来の直接Gemini APIリクエスト（フォールバック用）
+async function handleDirectGeminiRequest(prompt, modelName, fetch) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEYが設定されていません');
+  }
+
+  // Geminiモデルのみサポート
+  if (modelName.startsWith('gemma')) {
+    throw new Error('直接APIではGemmaモデルはサポートされていません。Vertex AIを使用してください。');
+  }
+
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+  const isJsonRequest = prompt.includes('JSON') || prompt.includes('JSONスキーマ');
+  
+  const requestBody = {
+    contents: [{ 
+      role: 'user', 
+      parts: [{ text: prompt }] 
+    }],
+    generationConfig: {
+      temperature: 0.3,
+      topP: 0.8,
+      topK: 40,
+      maxOutputTokens: 8192
+    }
+  };
+
+  if (isJsonRequest) {
+    requestBody.generationConfig.responseMimeType = "application/json";
+  }
+
+  const response = await fetch(`${apiUrl}?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini APIエラー: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  if (data.candidates && data.candidates[0] && 
+      data.candidates[0].content && data.candidates[0].content.parts && 
+      data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) {
+    return data.candidates[0].content.parts[0].text;
+  } else {
+    throw new Error('予期しないレスポンス形式');
+  }
+}
+
+// Gemini APIへのリクエストを処理するエンドポイント（後方互換性のため残す）
 app.post('/api/gemini-advice', async (req, res) => {
   const fetch = await import('node-fetch').then(module => module.default);
   try {
@@ -700,6 +898,12 @@ app.get('/api/gemini-test', async (req, res) => {
 app.get('/api/server-info', (req, res) => {
   res.json({
     hasGeminiKey: !!process.env.GEMINI_API_KEY,
-    serverMode: process.env.NODE_ENV || 'development'
+    serverMode: process.env.NODE_ENV || 'development',
+    aiConfig: {
+      provider: API_PROVIDER,
+      defaultModel: AI_MODEL,
+      region: GOOGLE_CLOUD_REGION,
+      hasVertexAI: !!(GOOGLE_PROJECT_ID && GOOGLE_PRIVATE_KEY && GOOGLE_CLIENT_EMAIL)
+    }
   });
 }); 

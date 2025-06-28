@@ -133,7 +133,7 @@ async function handleChatSubmit() {
         removeThinkingMessage(thinkingId);
         
         // AIの返信を表示
-        showAiMessage(response);
+        await showAiMessage(response);
     } catch (error) {
         console.error('AIレスポンス生成エラー:', error);
         
@@ -226,35 +226,27 @@ function prepareAiPrompt(userMessage, fieldData, analysisData) {
 
 // Gemini APIによるチャットレスポンスの取得
 async function fetchGeminiChatResponse(apiKey, prompt, history) {
-    // Gemini APIのエンドポイント
-    const apiEndpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-06-17:generateContent';
+    // 統合AI APIのエンドポイント（Vertex AI対応）
+    const apiEndpoint = '/api/ai-advice';
     
     // チャット履歴から最大5つの会話を取得
     const recentHistory = history.slice(-5);
     
-    // 会話履歴をGemini API形式に変換
-    const chatHistory = recentHistory.map(item => ({
-        role: item.role,
-        parts: [{ text: item.content }]
-    }));
-    
-    // システムプロンプト（指示）を追加
-    chatHistory.unshift({
-        role: 'model',
-        parts: [{ text: prompt }]
-    });
+    // 履歴をプロンプトに統合（Vertex AI形式）
+    let fullPrompt = prompt;
+    if (recentHistory.length > 0) {
+        const historyText = recentHistory.map(item => 
+            `${item.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${item.content}`
+        ).join('\n');
+        fullPrompt = `これまでの会話履歴:\n${historyText}\n\n現在の質問:\n${prompt}`;
+    }
     
     const requestData = {
-        contents: chatHistory,
-        generationConfig: {
-            temperature: 0.3,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1024,
-        }
+        prompt: fullPrompt,
+        model: 'gemini-2.0-flash-thinking-exp-01-21' // 最新モデル
     };
     
-    const response = await fetch(`${apiEndpoint}?key=${apiKey}`, {
+    const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -264,23 +256,17 @@ async function fetchGeminiChatResponse(apiKey, prompt, history) {
     
     if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(`Gemini API エラー: ${errorData.error.message}`);
+        throw new Error(`AI API エラー: ${errorData.error || response.status}`);
     }
     
     const responseData = await response.json();
     
     // レスポンスから回答テキストを抽出
-    if (responseData.candidates && 
-        responseData.candidates[0] && 
-        responseData.candidates[0].content && 
-        responseData.candidates[0].content.parts && 
-        responseData.candidates[0].content.parts[0] &&
-        responseData.candidates[0].content.parts[0].text) {
-        
-        return responseData.candidates[0].content.parts[0].text;
+    if (responseData.success && responseData.result) {
+        return responseData.result;
     }
     
-    throw new Error('Gemini APIからの回答を解析できませんでした');
+    throw new Error('AI APIからの回答を解析できませんでした');
 }
 
 // モック（サンプル）チャットレスポンスの生成
@@ -412,7 +398,7 @@ function showUserMessage(message) {
 }
 
 // AIメッセージを表示
-function showAiMessage(message) {
+async function showAiMessage(message) {
     const chatMessages = document.getElementById('chat-messages');
     if (!chatMessages) return;
     
@@ -432,6 +418,9 @@ function showAiMessage(message) {
     `;
     
     chatMessages.appendChild(messageElement);
+    
+    // おすすめ質問コンポーネントを生成して追加
+    await generateAndShowSuggestedQuestions(message);
     
     // スクロールを一番下に
     chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -555,10 +544,230 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// おすすめの質問を生成して表示する関数
+async function generateAndShowSuggestedQuestions(aiResponse) {
+    try {
+        // 現在の圃場データと分析データを取得
+        const fieldData = getCurrentFieldData();
+        const analysisData = getLatestAnalysisData();
+        
+        // チャット履歴の最後の質問を取得（ユーザーの最後の質問）
+        const lastUserQuestion = chatHistory.length > 0 ? 
+            chatHistory.filter(msg => msg.role === 'user').pop()?.content : '';
+        
+        // おすすめ質問を生成
+        const suggestedQuestions = await generateSuggestedQuestions(lastUserQuestion, aiResponse, fieldData, analysisData);
+        
+        if (suggestedQuestions && suggestedQuestions.length > 0) {
+            showSuggestedQuestionsComponent(suggestedQuestions);
+        }
+    } catch (error) {
+        console.error('おすすめ質問の生成中にエラーが発生しました:', error);
+    }
+}
+
+// おすすめ質問を生成する関数
+async function generateSuggestedQuestions(userQuestion, aiResponse, fieldData, analysisData) {
+    try {
+        // プロンプトを作成
+        const prompt = createSuggestedQuestionsPrompt(userQuestion, aiResponse, fieldData, analysisData);
+        
+        // APIキーが設定されているか確認
+        const apiKey = getGeminiApiKey();
+        if (!apiKey) {
+            console.warn('Gemini APIキーが設定されていません。デフォルトのおすすめ質問を返します。');
+            return generateDefaultSuggestedQuestions(fieldData, analysisData);
+        }
+        
+        // Gemini APIを使用して質問を生成
+        const response = await fetchGeminiSuggestedQuestions(apiKey, prompt);
+        
+        return response;
+    } catch (error) {
+        console.error('おすすめ質問生成エラー:', error);
+        return generateDefaultSuggestedQuestions(fieldData, analysisData);
+    }
+}
+
+// おすすめ質問生成用のプロンプトを作成
+function createSuggestedQuestionsPrompt(userQuestion, aiResponse, fieldData, analysisData) {
+    let prompt = `
+あなたは農業の専門家AIアシスタントです。ユーザーとの会話の流れを分析して、次に聞きたくなるであろう3つの質問を提案してください。
+
+## 直前の会話:
+ユーザーの質問: ${userQuestion || '初回質問'}
+AIの回答: ${aiResponse}
+
+## 現在の圃場データ:
+`;
+
+    // 圃場データがある場合は追加
+    if (fieldData) {
+        prompt += `
+- 圃場名: ${fieldData.name || '不明'}
+- 作物: ${fieldData.crop || '不明'}
+- メモ: ${fieldData.memo || 'なし'}
+`;
+    } else {
+        prompt += `- 選択されている圃場はありません\n`;
+    }
+
+    // 分析データがある場合は追加
+    if (analysisData && analysisData.stats) {
+        const stats = analysisData.stats;
+        prompt += `
+## 最新の植生指標データ:
+- NDVI（植生指標）: ${stats.ndvi ? stats.ndvi.mean : '不明'}
+- NDMI（水分指標）: ${stats.ndmi ? stats.ndmi.mean : '不明'}
+- NDRE（栄養指標）: ${stats.ndre ? stats.ndre.mean : '不明'}
+`;
+    } else {
+        prompt += `\n## 植生指標データ: まだ分析されていません\n`;
+    }
+
+    prompt += `
+## 回答要求:
+上記の情報を基に、農家が次に知りたくなるであろう実用的で具体的な質問を3つ提案してください。
+質問は以下の条件を満たしてください：
+1. 各質問は30文字以内で簡潔に
+2. 農業の実践に役立つ内容
+3. 現在のデータや会話の流れに関連している
+4. 初心者にも理解しやすい表現
+
+回答は以下のJSON形式で返してください：
+{
+  "questions": [
+    "質問1",
+    "質問2", 
+    "質問3"
+  ]
+}
+`;
+
+    return prompt;
+}
+
+// Gemini APIを使っておすすめ質問を取得
+async function fetchGeminiSuggestedQuestions(apiKey, prompt) {
+    try {
+        // gemini-api.jsのgetGeminiAdvice関数を使用（チャットモード）
+        const chatData = {
+            type: 'suggested_questions',
+            message: prompt,
+            context: {
+                fieldData: getCurrentFieldData(),
+                analysisData: getLatestAnalysisData()
+            }
+        };
+        
+        const response = await window.getGeminiAdvice(null, chatData);
+        
+        if (response && response.success && response.chatResponse) {
+            // JSONレスポンスを解析
+            try {
+                const parsedResponse = JSON.parse(response.chatResponse);
+                if (parsedResponse.questions && Array.isArray(parsedResponse.questions)) {
+                    return parsedResponse.questions.slice(0, 3); // 最大3つ
+                }
+            } catch (parseError) {
+                console.warn('JSON解析に失敗、デフォルト質問を使用:', parseError);
+            }
+        }
+        
+        return generateDefaultSuggestedQuestions(getCurrentFieldData(), getLatestAnalysisData());
+    } catch (error) {
+        console.error('Gemini APIでおすすめ質問取得に失敗:', error);
+        return generateDefaultSuggestedQuestions(getCurrentFieldData(), getLatestAnalysisData());
+    }
+}
+
+// デフォルトのおすすめ質問を生成
+function generateDefaultSuggestedQuestions(fieldData, analysisData) {
+    const defaultQuestions = [];
+    
+    if (analysisData && analysisData.stats) {
+        // 分析データがある場合の質問
+        if (analysisData.stats.ndvi && analysisData.stats.ndvi.mean < 0.5) {
+            defaultQuestions.push('植生を改善するにはどうすれば良いですか？');
+        }
+        if (analysisData.stats.ndmi && analysisData.stats.ndmi.mean < 0.2) {
+            defaultQuestions.push('水分不足の対策を教えてください');
+        }
+        if (analysisData.stats.ndre && analysisData.stats.ndre.mean < 0.15) {
+            defaultQuestions.push('どのような肥料が効果的ですか？');
+        }
+        
+        // 足りない分をランダムで補完
+        const additionalQuestions = [
+            '収穫時期の見極め方を教えて',
+            '病害虫の予防方法は？',
+            '次の作付けの準備はいつから？'
+        ];
+        
+        while (defaultQuestions.length < 3 && additionalQuestions.length > 0) {
+            const randomIndex = Math.floor(Math.random() * additionalQuestions.length);
+            defaultQuestions.push(additionalQuestions.splice(randomIndex, 1)[0]);
+        }
+    } else {
+        // 分析データがない場合の基本的な質問
+        defaultQuestions.push(
+            'この圃場の状態を詳しく知りたい',
+            '植生指標の見方を教えて',
+            '分析結果の活用方法は？'
+        );
+    }
+    
+    return defaultQuestions.slice(0, 3);
+}
+
+// おすすめ質問コンポーネントを表示
+function showSuggestedQuestionsComponent(questions) {
+    const chatMessages = document.getElementById('chat-messages');
+    if (!chatMessages || !questions || questions.length === 0) return;
+    
+    const suggestedQuestionsElement = document.createElement('div');
+    suggestedQuestionsElement.className = 'suggested-questions-container';
+    suggestedQuestionsElement.innerHTML = `
+        <div class="suggested-questions-header">
+            <i class="fas fa-lightbulb text-yellow-500"></i>
+            <span class="suggested-questions-title">次のおすすめ質問</span>
+        </div>
+        <div class="suggested-questions-buttons">
+            ${questions.map((question, index) => `
+                <button 
+                    class="suggested-question-btn" 
+                    onclick="handleSuggestedQuestionClick('${escapeHtml(question)}')"
+                    data-question="${escapeHtml(question)}"
+                >
+                    ${escapeHtml(question)}
+                </button>
+            `).join('')}
+        </div>
+    `;
+    
+    chatMessages.appendChild(suggestedQuestionsElement);
+}
+
+// おすすめ質問ボタンクリック時の処理
+function handleSuggestedQuestionClick(question) {
+    const chatInput = document.getElementById('chat-input');
+    if (chatInput) {
+        // 質問をテキストエリアに入力
+        chatInput.value = question;
+        chatInput.focus();
+        
+        // オプション: 自動的に送信する場合
+        // handleChatSubmit();
+    }
+}
+
 // エクスポート
 window.aiChat = {
     initialize: initializeAiChat,
     togglePanel: toggleChatPanel,
     closePanel: closePanel,
     clearChat: clearChat
-}; 
+};
+
+// おすすめ質問のクリックハンドラをグローバルに公開
+window.handleSuggestedQuestionClick = handleSuggestedQuestionClick; 

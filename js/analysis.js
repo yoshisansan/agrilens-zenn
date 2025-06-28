@@ -124,24 +124,22 @@ function processIndicesStats(rawStats) {
 }
 
 // 分析結果の表示
-function displayAnalysisResults(data) {
-    console.log("GEEから受信した分析データ:", data);
-    
-    // 保存された分析IDを保持する変数（関数全体で使用するため）
-    let savedAnalysisId = null;
-
-    // 各植生指標レイヤーの追加
+// 植生指標レイヤーの処理
+function processVegetationLayers(data) {
     addVegetationIndicesLayers(data);
-    console.log("渡されている data の内容:", JSON.stringify(data, null, 2)); // dataの内容確認用ログ
+    console.log("渡されている data の内容:", JSON.stringify(data, null, 2));
+}
 
-    // 統計データの取得と整形
+// 統計データの処理と表示
+function processAndDisplayStats(data) {
     const stats = processIndicesStats(data.stats);
-
-    // 詳細な統計データのログ出力
+    
     const formatNumber = (value) => {
         if (typeof value === 'string' && value === '-') return '-';
         const num = parseFloat(value);
-        return isNaN(num) ? '-' : num.toFixed(3);
+        const config = window.ModuleManager?.get('config') || window.CONFIG;
+        const places = config?.UI?.DEFAULT_DECIMAL_PLACES || 3;
+        return isNaN(num) ? '-' : num.toFixed(places);
     };
     
     console.log('GEE分析統計データ:', {
@@ -167,27 +165,25 @@ function displayAnalysisResults(data) {
         },
         日付範囲: data.dateRange
     });
+    
+    return stats;
+}
 
-    // 健康状態の総合評価
+// UI更新処理
+function updateAnalysisUI(stats, dateRange) {
     const evaluation = evaluateFieldHealth(stats);
-    
-    // サマリーの更新
     updateHealthSummary(evaluation, stats);
-    
-    // AIによる基本的な診断コメント
     updateAiComment(evaluation, stats);
+    updateDetailedStats(stats, dateRange);
     
-    // 詳細統計の更新
-    updateDetailedStats(stats, data.dateRange);
-    
-    // 分析結果パネルの表示（2回目以降も確実に表示されるようにする）
+    // 分析結果パネルの表示
     if (analysisResultsEl) {
-        // 一度非表示にしてから表示することで、DOMの更新を確実にする
         analysisResultsEl.classList.add('hidden');
-        // 少し遅延させて確実に表示する
+        const config = window.ModuleManager?.get('config') || window.CONFIG;
+        const delay = config?.UI?.PANEL_ANIMATION_DELAY || 50;
         setTimeout(() => {
             analysisResultsEl.classList.remove('hidden');
-        }, 50);
+        }, delay);
     }
     
     // 生成時刻を更新
@@ -195,25 +191,26 @@ function displayAnalysisResults(data) {
     if (timeEl) {
         timeEl.textContent = `生成時刻: ${new Date().toLocaleString()}`;
     }
+}
+
+// 分析完了処理
+function handleAnalysisCompletion(data, stats) {
+    const formatNumber = (value) => {
+        if (typeof value === 'string' && value === '-') return '-';
+        const num = parseFloat(value);
+        const config = window.ModuleManager?.get('config') || window.CONFIG;
+        const places = config?.UI?.DEFAULT_DECIMAL_PLACES || 3;
+        return isNaN(num) ? '-' : num.toFixed(places);
+    };
     
-    // タイルURLが無い場合のメッセージ表示
     if (!data.ndviTileUrlTemplate && !data.ndmiTileUrlTemplate && !data.ndreTileUrlTemplate) {
         showToast("注意", "マップ表示用の植生指標レイヤーを生成できませんでしたが、統計データは分析できました。");
     } else {
-    // 完了メッセージの表示
-        const formatNumber = (value) => {
-            if (typeof value === 'string' && value === '-') return '-';
-            const num = parseFloat(value);
-            return isNaN(num) ? '-' : num.toFixed(3);
-        };
-        
         showToast("分析完了", `植生指標分析が完了しました。NDVI: ${formatNumber(stats.ndvi.mean)}、NDMI: ${formatNumber(stats.ndmi.mean)}、NDRE: ${formatNumber(stats.ndre.mean)}`);
     }
     
-    // AIアドバイスタブの初期準備 (Gemini API連携)
     prepareAiAdviceTab();
-
-    // 分析完了イベントを発火（Gemini APIコール用）
+    
     const analysisCompletedEvent = new CustomEvent('analysisCompleted', { 
         detail: { 
             dateRange: data.dateRange,
@@ -221,276 +218,365 @@ function displayAnalysisResults(data) {
         }
     });
     document.dispatchEvent(analysisCompletedEvent);
+}
 
-    // AIアドバイス取得処理
-    const fieldData = getCurrentFieldDataForAnalysis(); // 現在の圃場データを取得する関数
+function displayAnalysisResults(data) {
+    console.log("GEEから受信した分析データ:", data);
+    
+    let savedAnalysisId = null;
+    
+    // 植生指標レイヤーの処理
+    processVegetationLayers(data);
+    
+    // 統計データの処理と表示
+    const stats = processAndDisplayStats(data);
+    
+    // UI更新
+    updateAnalysisUI(stats, data.dateRange);
+    
+    // 完了処理
+    handleAnalysisCompletion(data, stats);
+    
+    // AIアドバイス処理
+    handleAiAdviceProcessing(stats, savedAnalysisId, data);
+}
+
+// AIアドバイス処理メイン関数
+function handleAiAdviceProcessing(stats, savedAnalysisId, data) {
+    const fieldData = getCurrentFieldDataForAnalysis();
     console.log('圃場データ取得成功:', fieldData);
-    if (fieldData) {
-        // windowオブジェクト経由で明示的に関数を呼び出し、エラー回避
-        console.log('グローバル関数の存在確認:', typeof window.getGeminiAdvice);
-        
-        // 関数が存在しない場合はダミーアドバイスを生成
-        if (typeof window.getGeminiAdvice !== 'function') {
-            console.warn('getGeminiAdvice関数が見つからないため、ダミーアドバイスを生成します');
-            const dummyAdvice = {
-                "重要な知見のまとめ": "NDVI値、NDMI値、NDRE値に基づく分析結果から、全体的に圃場は正常な状態と評価されます。定期的なモニタリングを継続してください。"
-            };
-            
-            // 既存のUI更新処理を直接使用（別関数は作らない）
-            const aiRecommendations = document.getElementById('aiRecommendations');
-            if (aiRecommendations) {
-                let adviceContent = '<h3 class="text-lg font-semibold mb-2">AIによる詳細アドバイス</h3>';
-                if (dummyAdvice.重要な知見のまとめ) {
-                    adviceContent += `<p class="mb-2"><strong>重要な知見のまとめ:</strong> ${dummyAdvice.重要な知見のまとめ}</p>`;
-                }
-                aiRecommendations.innerHTML = adviceContent;
-            }
-            
-            return; // ダミーアドバイスを表示した後は処理を終了
+    
+    if (!fieldData) {
+        handleNoFieldData();
+        return;
+    }
+    
+    if (typeof window.getGeminiAdvice !== 'function') {
+        handleDummyAdvice();
+        return;
+    }
+    
+    processGeminiAdvice(stats, fieldData, savedAnalysisId, data);
+}
+
+// 圃場データがない場合の処理
+function handleNoFieldData() {
+    console.warn('AIアドバイス取得のための圃場データがありません。');
+    const aiRecommendations = document.getElementById('aiRecommendations');
+    if (aiRecommendations) {
+        aiRecommendations.innerHTML = '<p class=\"text-yellow-500\">AIアドバイスを生成するための圃場情報が選択されていません。</p>';
+    }
+}
+
+// ダミーアドバイス表示処理
+function handleDummyAdvice() {
+    console.warn('getGeminiAdvice関数が見つからないため、ダミーアドバイスを生成します');
+    const dummyAdvice = {
+        "重要な知見のまとめ": "NDVI値、NDMI値、NDRE値に基づく分析結果から、全体的に圃場は正常な状態と評価されます。定期的なモニタリングを継続してください。"
+    };
+    
+    const aiRecommendations = document.getElementById('aiRecommendations');
+    if (aiRecommendations) {
+        let adviceContent = '<h3 class=\"text-lg font-semibold mb-2\">AIによる詳細アドバイス</h3>';
+        if (dummyAdvice.重要な知見のまとめ) {
+            adviceContent += `<p class=\"mb-2\"><strong>重要な知見のまとめ:</strong> ${dummyAdvice.重要な知見のまとめ}</p>`;
         }
-        
-        // 分析データを単純化 - APIに送信しやすい形式に変換
-        const simplifiedStats = {
-            ndvi: stats.ndvi.mean || 0,
-            ndmi: stats.ndmi.mean || 0,
-            ndre: stats.ndre.mean || 0
-        };
-        
-        console.log('AIに送信する単純化された統計データ:', simplifiedStats);
-        
-        try {
-            // グローバル関数経由で呼び出す
-            window.getGeminiAdvice(simplifiedStats, fieldData)
-                .then(advice => {
-                    console.log('AIアドバイス取得成功:', advice);
-                    
-                    // グローバル変数を更新
-                    if (window.latestAnalysisData) {
-                        window.latestAnalysisData.advice = advice;
-                    }
-                    
-                    // ローカルストレージを更新
-                    if (savedAnalysisId && window.AnalysisStorage) {
-                        try {
-                            const existingResult = window.AnalysisStorage.getById(savedAnalysisId);
-                            if (existingResult) {
-                                existingResult.aiAdvice = advice;
-                                // 結果を再保存（更新）
-                                const results = window.AnalysisStorage.getAll();
-                                const resultIndex = results.findIndex(r => r.id === savedAnalysisId);
-                                if (resultIndex !== -1) {
-                                    results[resultIndex] = existingResult;
-                                    localStorage.setItem('agrilens_analysis_results', JSON.stringify(results));
-                                    console.log('AIアドバイスでローカルストレージを更新しました');
-                                }
-                            }
-                        } catch (error) {
-                            console.error('AIアドバイス保存中にエラーが発生しました:', error);
-                        }
-                    }
-                    const aiRecommendations = document.getElementById('aiRecommendations');
-                    if (aiRecommendations) {
-                        if (advice && !advice.error) {
-                            // リッチなUIタイトルを追加
-                            let adviceContent = `
-                                <div class="mb-4">
-                                    <h3 class="text-lg font-semibold mb-1 text-center bg-green-100 py-2 rounded-t-lg border-b border-green-200">
-                                        圃場の健康状態と対策
-                                    </h3>
-                                </div>
-                            `;
-                            
-                            // 重要な知見のまとめをカードスタイルで表示
-                            if (advice.重要な知見のまとめ) {
-                                adviceContent += `
-                                    <div class="mb-4 p-4 bg-green-50 rounded-lg border border-green-100">
-                                        <div class="flex items-start">
-                                            <div class="mr-2">
-                                                <span class="inline-block bg-green-100 p-2 rounded-full">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-                                                    </svg>
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <h4 class="font-semibold text-green-800 mb-1">重要な知見のまとめ</h4>
-                                                <p class="text-sm text-gray-700">${advice.重要な知見のまとめ}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `;
-                            }
-                            
-                            // 詳細な評価セクション
-                            if (advice.詳細な評価) {
-                                adviceContent += `<div class="mb-2">
-                                    <h4 class="font-semibold text-gray-700" id="detailedEvaluation">詳細な評価</h4>
-                                </div>`;
-                                
-                                // NDMI（水分ストレス）カード
-                                if (advice.詳細な評価.NDMI) {
-                                    adviceContent += `
-                                        <div class="mb-3 p-4 bg-yellow-50 rounded-lg">
-                                            <div class="flex justify-between items-center mb-2">
-                                                <div class="flex items-center">
-                                                    <span class="inline-block text-yellow-500 mr-2">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                            <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" />
-                                                        </svg>
-                                                    </span>
-                                                    <h5 class="font-semibold text-gray-700">水分ストレス (NDMI)</h5>
-                                                </div>
-                                                <span class="text-yellow-600 font-medium bg-yellow-100 px-2 py-1 rounded-full text-xs">数値 ${advice.詳細な評価.NDMI.value?.toFixed(2) || '0.00'}</span>
-                                            </div>
-                                            <p class="text-sm text-gray-600">${advice.詳細な評価.NDMI.text}</p>
-                                        </div>
-                                    `;
-                                }
-                                
-                                // NDRE（根類状態）カード
-                                if (advice.詳細な評価.NDRE) {
-                                    adviceContent += `
-                                        <div class="mb-3 p-4 bg-gray-50 rounded-lg">
-                                            <div class="flex justify-between items-center mb-2">
-                                                <div class="flex items-center">
-                                                    <span class="inline-block text-gray-500 mr-2">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                            <path fill-rule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1z" clip-rule="evenodd" />
-                                                        </svg>
-                                                    </span>
-                                                    <h5 class="font-semibold text-gray-700">根類状態 (NDRE)</h5>
-                                                </div>
-                                                <span class="text-gray-600 font-medium bg-gray-200 px-2 py-1 rounded-full text-xs">数値 ${advice.詳細な評価.NDRE.value?.toFixed(2) || '0.00'}</span>
-                                            </div>
-                                            <p class="text-sm text-gray-600">${advice.詳細な評価.NDRE.text}</p>
-                                        </div>
-                                    `;
-                                }
-                            }
-                            
-                            // 具体的な対策セクション
-                            if (advice.具体的な対策 && advice.具体的な対策.length > 0) {
-                                adviceContent += `
-                                    <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                                        <div class="flex items-center mb-2">
-                                            <span class="inline-block text-blue-600 mr-2">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                                </svg>
-                                            </span>
-                                            <h4 class="font-semibold text-blue-800">具体的な対策</h4>
-                                        </div>
-                                        <ul class="list-none pl-8">
-                                            ${advice.具体的な対策.map(item => `
-                                                <li class="mb-2 flex items-start">
-                                                    <span class="inline-block text-blue-600 mr-2 mt-1">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                                                        </svg>
-                                                    </span>
-                                                    <span class="text-gray-700 text-sm">${item}</span>
-                                                </li>
-                                            `).join('')}
-                                        </ul>
-                                    </div>
-                                `;
-                            }
-                            
-                            // 今後の管理ポイントセクション
-                            if (advice.今後の管理ポイント && advice.今後の管理ポイント.length > 0) {
-                                adviceContent += `
-                                    <div class="mb-2 p-4 bg-yellow-50 rounded-lg border border-yellow-100">
-                                        <div class="flex items-center mb-2">
-                                            <span class="inline-block text-yellow-600 mr-2">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                            </span>
-                                            <h4 class="font-semibold text-yellow-800">今後の管理ポイント</h4>
-                                        </div>
-                                        <ul class="list-none pl-8">
-                                            ${advice.今後の管理ポイント.map(item => `
-                                                <li class="mb-2 flex items-start">
-                                                    <span class="inline-block text-yellow-600 mr-2 mt-1">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                                                        </svg>
-                                                    </span>
-                                                    <span class="text-gray-700 text-sm">${item}</span>
-                                                </li>
-                                            `).join('')}
-                                        </ul>
-                                    </div>
-                                `;
-                            }
-                            
-                            // 生成時間
-                            const currentTime = new Date().toLocaleString('ja-JP');
-                            adviceContent += `
-                                <div class="text-right text-xs text-gray-400 mt-4">
-                                    分析生成: ${currentTime}
-                                </div>
-                            `;
-                            
-                            aiRecommendations.innerHTML = adviceContent;
-                        } else {
-                            aiRecommendations.innerHTML = `<p class="text-red-500">AIアドバイスの取得に失敗しました。${advice && advice.message ? advice.message : ''}</p>`;
-                        }
-                    } else {
-                        console.error('aiRecommendations element not found');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching Gemini advice:', error);
-                    const aiRecommendations = document.getElementById('aiRecommendations');
-                    if (aiRecommendations) {
-                        aiRecommendations.innerHTML = '<p class="text-red-500">AIアドバイスの取得中にエラーが発生しました。</p>';
-                    }
-                });
-        } catch (error) {
-            console.error('AIアドバイス取得処理でエラーが発生:', error);
-            const aiRecommendations = document.getElementById('aiRecommendations');
-            if (aiRecommendations) {
-                aiRecommendations.innerHTML = '<p class="text-red-500">AIアドバイスの呼び出しエラー: ' + error.message + '</p>';
-            }
-        }
+        aiRecommendations.innerHTML = adviceContent;
+    }
+}
+
+// Gemini APIアドバイス処理
+function processGeminiAdvice(stats, fieldData, savedAnalysisId, data) {
+    const simplifiedStats = {
+        ndvi: stats.ndvi.mean || 0,
+        ndmi: stats.ndmi.mean || 0,
+        ndre: stats.ndre.mean || 0
+    };
+    
+    console.log('AIに送信する単純化された統計データ:', simplifiedStats);
+    
+    try {
+        window.getGeminiAdvice(simplifiedStats, fieldData)
+            .then(advice => handleAdviceSuccess(advice, savedAnalysisId, data, stats))
+            .catch(error => handleAdviceError(error));
+    } catch (error) {
+        handleAdviceError(error);
+    }
+}
+
+// アドバイス取得成功時の処理
+function handleAdviceSuccess(advice, savedAnalysisId, data, stats) {
+    console.log('AIアドバイス取得成功:', advice);
+    
+    updateGlobalData(advice, data, stats);
+    updateLocalStorage(advice, savedAnalysisId);
+    displayAdviceUI(advice);
+    
+    // データ保存とUI更新
+    saveAnalysisData(data, stats, savedAnalysisId);
+    updateHistorySections();
+}
+
+// グローバルデータ更新
+function updateGlobalData(advice, data, stats) {
+    if (window.latestAnalysisData) {
+        window.latestAnalysisData.advice = advice;
     } else {
-        console.warn('AIアドバイス取得のための圃場データがありません。');
-        const aiRecommendations = document.getElementById('aiRecommendations');
-        if (aiRecommendations) {
-            aiRecommendations.innerHTML = '<p class="text-yellow-500">AIアドバイスを生成するための圃場情報が選択されていません。</p>';
+        window.latestAnalysisData = {
+            dateRange: data.dateRange,
+            stats: stats,
+            advice: advice
+        };
+    }
+}
+
+// ローカルストレージ更新
+function updateLocalStorage(advice, savedAnalysisId) {
+    if (savedAnalysisId && window.AnalysisStorage) {
+        try {
+            const existingResult = window.AnalysisStorage.getById(savedAnalysisId);
+            if (existingResult) {
+                existingResult.aiAdvice = advice;
+                const results = window.AnalysisStorage.getAll();
+                const resultIndex = results.findIndex(r => r.id === savedAnalysisId);
+                if (resultIndex !== -1) {
+                    results[resultIndex] = existingResult;
+                    localStorage.setItem('agrilens_analysis_results', JSON.stringify(results));
+                    console.log('AIアドバイスでローカルストレージを更新しました');
+                }
+            }
+        } catch (error) {
+            console.error('AIアドバイス保存中にエラーが発生しました:', error);
         }
     }
+}
 
-    // グローバル変数に最新の分析データを保存（初期値）
-    window.latestAnalysisData = {
-        dateRange: data.dateRange,
-        stats: stats,
-        advice: null // AIアドバイスは後で更新される
-    };
+// アドバイスUI表示
+function displayAdviceUI(advice) {
+    const aiRecommendations = document.getElementById('aiRecommendations');
+    if (!aiRecommendations) {
+        console.error('aiRecommendations element not found');
+        return;
+    }
+    
+    if (advice && !advice.error) {
+        aiRecommendations.innerHTML = buildAdviceHTML(advice);
+    } else {
+        // エラー時のメッセージを改善
+        const errorMessage = advice && advice.message ? advice.message : 'AIアドバイスの取得に失敗しました。';
+        aiRecommendations.innerHTML = `
+        <div class="text-center p-6 bg-red-50 rounded-lg border border-red-200">
+            <div class="text-red-600 mb-3"><i class="fas fa-exclamation-circle text-3xl"></i></div>
+            <h4 class="font-medium mb-2 text-lg">AIアドバイス取得エラー</h4>
+            <p class="text-sm text-gray-700">${errorMessage}</p>
+        </div>`;
+    }
+}
 
-    // 分析結果をローカルストレージに保存（初期保存、AIアドバイスは後で更新）
-    // 保存済み結果を表示中の場合はスキップ
+// アドバイスHTML構築
+function buildAdviceHTML(advice) {
+    let adviceContent = buildAdviceHeader();
+    
+    if (advice.重要な知見のまとめ) {
+        adviceContent += buildSummaryCard(advice.重要な知見のまとめ);
+    }
+    
+    if (advice.詳細な評価) {
+        adviceContent += buildDetailedEvaluation(advice.詳細な評価);
+    }
+    
+    if (advice.具体的な対策 && advice.具体的な対策.length > 0) {
+        adviceContent += buildActionPlan(advice.具体的な対策);
+    }
+    
+    if (advice.今後の管理ポイント && advice.今後の管理ポイント.length > 0) {
+        adviceContent += buildManagementPoints(advice.今後の管理ポイント);
+    }
+    
+    adviceContent += buildTimestamp();
+    
+    return adviceContent;
+}
+
+// ヘッダー構築
+function buildAdviceHeader() {
+    return window.AnalysisTemplates ? window.AnalysisTemplates.analysisHeader() : 
+        `<div class="mb-4">
+            <h3 class="text-lg font-semibold mb-1 text-center bg-green-100 py-2 rounded-t-lg border-b border-green-200">
+                圃場の健康状態と対策
+            </h3>
+        </div>`;
+}
+
+// サマリーカード構築
+function buildSummaryCard(summary) {
+    return window.AnalysisTemplates ? window.AnalysisTemplates.summaryCard(summary) :
+        `<div class="mb-4 p-4 bg-green-50 rounded-lg border border-green-100">
+            <div class="flex items-start">
+                <div class="mr-2">
+                    <span class="inline-block bg-green-100 p-2 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                        </svg>
+                    </span>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-green-800 mb-1">重要な知見のまとめ</h4>
+                    <p class="text-sm text-gray-700">${summary}</p>
+                </div>
+            </div>
+        </div>`;
+}
+
+// 詳細評価セクション構築  
+function buildDetailedEvaluation(evaluation) {
+    let content = window.AnalysisTemplates ? 
+        window.AnalysisTemplates.detailedEvaluationHeader() :
+        `<div class="mb-2"><h4 class="font-semibold text-gray-700" id="detailedEvaluation">詳細な評価</h4></div>`;
+    
+    if (evaluation.NDMI) {
+        content += buildNDMICard(evaluation.NDMI);
+    }
+    
+    if (evaluation.NDRE) {
+        content += buildNDRECard(evaluation.NDRE);
+    }
+    
+    return content;
+}
+
+// NDMIカード構築
+function buildNDMICard(ndmi) {
+    return window.AnalysisTemplates ? window.AnalysisTemplates.ndmiCard(ndmi) :
+        `<div class="mb-3 p-4 bg-yellow-50 rounded-lg">
+            <div class="flex justify-between items-center mb-2">
+                <div class="flex items-center">
+                    <span class="inline-block text-yellow-500 mr-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" />
+                        </svg>
+                    </span>
+                    <h5 class="font-semibold text-gray-700">水分ストレス (NDMI)</h5>
+                </div>
+                <span class="text-yellow-600 font-medium bg-yellow-100 px-2 py-1 rounded-full text-xs">数値 ${ndmi.value?.toFixed(2) || '0.00'}</span>
+            </div>
+            <p class="text-sm text-gray-600">${ndmi.text}</p>
+        </div>`;
+}
+
+// NDREカード構築
+function buildNDRECard(ndre) {
+    return window.AnalysisTemplates ? window.AnalysisTemplates.ndreCard(ndre) :
+        `<div class="mb-3 p-4 bg-gray-50 rounded-lg">
+            <div class="flex justify-between items-center mb-2">
+                <div class="flex items-center">
+                    <span class="inline-block text-gray-500 mr-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1z" clip-rule="evenodd" />
+                        </svg>
+                    </span>
+                    <h5 class="font-semibold text-gray-700">根類状態 (NDRE)</h5>
+                </div>
+                <span class="text-gray-600 font-medium bg-gray-200 px-2 py-1 rounded-full text-xs">数値 ${ndre.value?.toFixed(2) || '0.00'}</span>
+            </div>
+            <p class="text-sm text-gray-600">${ndre.text}</p>
+        </div>`;
+}
+
+// 対策プラン構築
+function buildActionPlan(actions) {
+    return window.AnalysisTemplates ? window.AnalysisTemplates.actionPlan(actions) : 
+        buildFallbackActionPlan(actions);
+}
+
+// フォールバック用対策プラン
+function buildFallbackActionPlan(actions) {
+    return `<div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+        <div class="flex items-center mb-2">
+            <span class="inline-block text-blue-600 mr-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+            </span>
+            <h4 class="font-semibold text-blue-800">具体的な対策</h4>
+        </div>
+        <ul class="list-none pl-8">
+            ${actions.map(item => `
+                <li class="mb-2 flex items-start">
+                    <span class="inline-block text-blue-600 mr-2 mt-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </span>
+                    <span class="text-gray-700 text-sm">${item}</span>
+                </li>
+            `).join('')}
+        </ul>
+    </div>`;
+}
+
+// 管理ポイント構築
+function buildManagementPoints(points) {
+    return window.AnalysisTemplates ? window.AnalysisTemplates.managementPoints(points) :
+        buildFallbackManagementPoints(points);
+}
+
+// フォールバック用管理ポイント
+function buildFallbackManagementPoints(points) {
+    return `<div class="mb-2 p-4 bg-yellow-50 rounded-lg border border-yellow-100">
+        <div class="flex items-center mb-2">
+            <span class="inline-block text-yellow-600 mr-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </span>
+            <h4 class="font-semibold text-yellow-800">今後の管理ポイント</h4>
+        </div>
+        <ul class="list-none pl-8">
+            ${points.map(item => `
+                <li class="mb-2 flex items-start">
+                    <span class="inline-block text-yellow-600 mr-2 mt-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </span>
+                    <span class="text-gray-700 text-sm">${item}</span>
+                </li>
+            `).join('')}
+        </ul>
+    </div>`;
+}
+
+// タイムスタンプ構築
+function buildTimestamp() {
+    return window.AnalysisTemplates ? window.AnalysisTemplates.timestamp() :
+        `<div class="text-right text-xs text-gray-400 mt-4">
+            分析生成: ${new Date().toLocaleString('ja-JP')}
+        </div>`;
+}
+
+// データ保存処理
+function saveAnalysisData(data, stats, savedAnalysisId) {
     if (typeof window.AnalysisStorage !== 'undefined' && !window.isDisplayingStoredResult) {
         try {
             const fieldData = getCurrentFieldDataForAnalysis();
-            savedAnalysisId = window.AnalysisStorage.save(
-                {
-                    dateRange: data.dateRange,
-                    stats: stats,
-                    ndviTileUrlTemplate: data.ndviTileUrlTemplate,
-                    ndmiTileUrlTemplate: data.ndmiTileUrlTemplate,
-                    ndreTileUrlTemplate: data.ndreTileUrlTemplate
-                },
-                fieldData,
-                null // AIアドバイスは後で更新
-            );
-            
-            if (savedAnalysisId) {
-                console.log('分析結果をローカルストレージに保存しました。ID:', savedAnalysisId);
+            if (!savedAnalysisId) {
+                savedAnalysisId = window.AnalysisStorage.save(
+                    {
+                        dateRange: data.dateRange,
+                        stats: stats,
+                        ndviTileUrlTemplate: data.ndviTileUrlTemplate,
+                        ndmiTileUrlTemplate: data.ndmiTileUrlTemplate,
+                        ndreTileUrlTemplate: data.ndreTileUrlTemplate
+                    },
+                    fieldData,
+                    null
+                );
                 
-                // 保存ボタンを分析結果エリアに追加
-                addSaveIndicatorToResults(savedAnalysisId);
+                if (savedAnalysisId) {
+                    console.log('分析結果をローカルストレージに保存しました。ID:', savedAnalysisId);
+                    addSaveIndicatorToResults(savedAnalysisId);
+                }
             }
         } catch (error) {
             console.error('分析結果の保存中にエラーが発生しました:', error);
@@ -498,14 +584,56 @@ function displayAnalysisResults(data) {
     } else {
         console.warn('AnalysisStorage モジュールが読み込まれていません');
     }
+}
 
-    // 履歴セクションを更新（保存済み結果表示中でない場合のみ）
+// 履歴セクション更新
+function updateHistorySections() {
     if (!window.isDisplayingStoredResult) {
         updateAnalysisHistorySection();
         
-        // AI アシスタント履歴選択も更新
         if (window.AiAssistantHistory) {
             window.AiAssistantHistory.update();
+        }
+    }
+}
+
+// エラーハンドリング
+function handleAdviceError(error) {
+    console.error('Error fetching Gemini advice:', error);
+    const aiRecommendations = document.getElementById('aiRecommendations');
+    if (aiRecommendations) {
+        // APIキー関連のエラーかチェック
+        if (error.message && (
+            error.message.includes('APIキー') || 
+            error.message.includes('API key') ||
+            error.message.includes('設定されていません') ||
+            error.message.includes('authentication')
+        )) {
+            // APIキー設定エラーの場合の表示
+            aiRecommendations.innerHTML = `
+            <div class="text-center p-6 bg-yellow-50 rounded-lg border border-yellow-200">
+                <div class="text-yellow-600 mb-3"><i class="fas fa-exclamation-triangle text-3xl"></i></div>
+                <h4 class="font-medium mb-2 text-lg">Gemini APIキーが設定されていません</h4>
+                <p class="mb-3">詳細な作物分析アドバイスを受け取るには、サーバー側の環境変数に Gemini APIキーを設定してください。</p>
+                <p class="text-sm text-gray-600">エラー詳細: ${error.message}</p>
+            </div>`;
+        } else {
+            // その他のエラーの場合
+            if (error.message) {
+                aiRecommendations.innerHTML = `
+                <div class="text-center p-6 bg-red-50 rounded-lg border border-red-200">
+                    <div class="text-red-600 mb-3"><i class="fas fa-exclamation-circle text-3xl"></i></div>
+                    <h4 class="font-medium mb-2 text-lg">AIアドバイス取得エラー</h4>
+                    <p class="text-sm text-gray-700">エラー: ${error.message}</p>
+                </div>`;
+            } else {
+                aiRecommendations.innerHTML = `
+                <div class="text-center p-6 bg-red-50 rounded-lg border border-red-200">
+                    <div class="text-red-600 mb-3"><i class="fas fa-exclamation-circle text-3xl"></i></div>
+                    <h4 class="font-medium mb-2 text-lg">AIアドバイス取得エラー</h4>
+                    <p class="text-sm text-gray-700">AIアドバイスの取得中にエラーが発生しました。しばらくしてからもう一度お試しください。</p>
+                </div>`;
+            }
         }
     }
 }
@@ -515,30 +643,17 @@ function displayAnalysisResults(data) {
 function prepareAiAdviceTab() {
     const aiRecommendations = document.getElementById('aiRecommendations');
 
-    // Gemini APIキーが環境変数に設定されているか確認
-    const hasApiKey = window.ENV && window.ENV.GEMINI_API_KEY;
-
     // メインのAIコメント領域にローディング表示
     if (aiRecommendations) {
-        // すでに内容がある場合は上書きしない
-        if (aiRecommendations.textContent.includes('分析結果を読み込み中') || aiRecommendations.innerHTML.includes('animate-spin')) {
-            aiRecommendations.innerHTML = `
-            <div class="flex justify-center items-center py-6">
-                <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mr-3"></div>
-                <p class="text-gray-600 text-lg">AIアドバイスを生成中...</p>
-            </div>`;
-        }
-    }
-
-    // APIキーがない場合の警告表示
-    if (!hasApiKey && aiRecommendations) {
+        // AIアドバイス生成中のメッセージを表示
         aiRecommendations.innerHTML = `
-        <div class="text-center p-6 bg-yellow-50 rounded-lg border border-yellow-200">
-            <div class="text-yellow-600 mb-3"><i class="fas fa-exclamation-triangle text-3xl"></i></div>
-            <h4 class="font-medium mb-2 text-lg">Gemini APIキーが設定されていません</h4>
-            <p class="mb-3">詳細な作物分析アドバイスを受け取るには、サーバー側の環境変数に Gemini APIキーを設定してください。</p>
+        <div class="flex justify-center items-center py-6">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mr-3"></div>
+            <p class="text-gray-600 text-lg">AIアドバイスを生成中...</p>
         </div>`;
     }
+    
+    // APIキー設定チェックは削除 - 実際のAPI呼び出し失敗時に処理するため
 }
 
 // 分析用の圃場データを取得する
@@ -1508,7 +1623,9 @@ function updateHealthSummary(evaluation, stats) {
     const formatNumber = (value) => {
         if (typeof value === 'string' && value === '-') return '-';
         const num = parseFloat(value);
-        return isNaN(num) ? '-' : num.toFixed(3);
+        const config = window.ModuleManager?.get('config') || window.CONFIG;
+        const places = config?.UI?.DEFAULT_DECIMAL_PLACES || 3;
+        return isNaN(num) ? '-' : num.toFixed(places);
     };
     
     updateOrCreateElement('avgNdviValue', formatNumber(stats.ndvi.mean));
@@ -1593,7 +1710,9 @@ function addStatRow(tableBody, indexName, description, statData, dateRange) {
     const formatNumber = (value) => {
         if (typeof value === 'string' && value === '-') return '-';
         const num = parseFloat(value);
-        return isNaN(num) ? '-' : num.toFixed(3);
+        const config = window.ModuleManager?.get('config') || window.CONFIG;
+        const places = config?.UI?.DEFAULT_DECIMAL_PLACES || 3;
+        return isNaN(num) ? '-' : num.toFixed(places);
     };
     
     const descCell = document.createElement('td');
