@@ -11,7 +11,12 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // ミドルウェアの設定
-app.use(cors());
+app.use(cors({
+    origin: process.env.NODE_ENV === 'production' 
+        ? [process.env.PRODUCTION_URL, /\.run\.app$/] 
+        : true,
+    credentials: true
+}));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '.'))); // 静的ファイルを提供
 app.use(session({
@@ -24,7 +29,7 @@ app.use(session({
 const oauth2Client = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/auth/callback'
+    process.env.GOOGLE_REDIRECT_URI || `${process.env.NODE_ENV === 'production' ? 'https' : 'http'}://${process.env.HOST || 'localhost:3000'}/auth/callback`
 );
 
 // 環境変数の検証

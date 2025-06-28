@@ -677,7 +677,7 @@ ${selectedDetails.map((detail, index) => `
 // おすすめ質問生成専用の関数
 async function generateSuggestedQuestionsResponse(prompt) {
     try {
-        // GemmaまたはGemini 2.0を使用してJSON形式のレスポンスを生成
+        // おすすめ質問生成にはGemma3（gemma-2-27b-it）を使用
         const apiKey = getGeminiApiKey();
         
         // JSON形式のレスポンスを明確に要求するプロンプトを追加
@@ -688,15 +688,16 @@ IMPORTANT: あなたは必ず以下のJSON形式で回答してください。�
 {
   "questions": [
     "質問1のテキスト",
-    "質問2のテキスト",
+    "質問2のテキスト", 
     "質問3のテキスト"
   ]
 }
 
 JSON以外のテキストや説明は一切含めず、上記のJSON形式のみで回答してください。`;
 
-        console.log('おすすめ質問生成用プロンプト送信中...');
-        const responseText = await fetchGeminiResponse(apiKey, enhancedPrompt);
+        console.log('おすすめ質問生成用プロンプト送信中（Gemma3使用）...');
+        // おすすめ質問生成にはGemma3モデル（gemma-2-27b-it）を明示的に指定
+        const responseText = await makeGeminiApiRequest(enhancedPrompt, 'gemma-2-27b-it');
         
         if (responseText && typeof responseText === 'string') {
             // JSON レスポンスを解析

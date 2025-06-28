@@ -6,7 +6,8 @@
       "Bash(ls:*)",
       "Bash(npm audit:*)",
       "Bash(npm test)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(chmod:*)"
     ],
     "deny": []
   }
