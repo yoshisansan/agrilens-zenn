@@ -1,8 +1,8 @@
 # コード品質定期検診チェックリスト
-# Version: 2.0
+# Version: 3.0
 # Project: agrilens-zenn
 # Purpose: ハッカソン提出に向けたコード品質の向上と、継続的な品質維持
-# 特記事項: HTML/JS/CSSとGemini API連携に特化した項目を強化
+# 特記事項: HTML/JS/CSSとGemini API連携に特化した項目を強化 + APIセキュリティ対応
 # 検診後はログを ./log/ へファイルを作成して記録する。日付_にちぢ_code_inspection.log というファイル名で保存する。
 # 例：20250626_101607_code_inspection.md
 
@@ -23,10 +23,12 @@ project_structure:
     - [ ] ディレクトリ構造が直感的（例: /src, /public, /assets, /components）
     - [ ] 不要なファイルや実験用のコードが削除されている
     - [ ] .gitignoreが適切で、不要なファイル（.env, node_modules等）を追跡していない
+    - [ ] サーバーサイドコードが適切にモジュール分割されている（src/config, src/middleware等）
   documentation:
     - [ ] .env.exampleが存在し、必要な環境変数がすべて記載されている
     - [ ] システム構成図や主要なデータフロー図がある
     - [ ] 主要な関数やロジックについて、JSDoc形式でコメントが記述されている
+    - [ ] セキュリティ要件とアーキテクチャ決定記録（ADR）が文書化されている
 
 # 2. コード品質 (Code Quality)
 code_quality:
@@ -67,11 +69,79 @@ gemini_integration:
     - [ ] プロンプトがコードから分離され、管理・改善しやすい（例: 定数ファイルやテンプレートとして管理）
     - [ ] プロンプトインジェクションに対する基本的な対策が検討されている
 
-# 4. セキュリティ (Security)
+# 4. セキュリティ (Security) - 大幅強化
 security:
-  - [ ] ユーザー入力のサニタイズ処理が実装され、XSS（クロスサイトスクリプティング）対策がされている
-  - [ ] 依存ライブラリに既知の脆弱性がないかチェックされている（npm audit等）
-  - [ ] httpsが強制され、混合コンテンツ（mixed content）が存在しない
+  api_security:
+    authentication_authorization:
+      - [ ] 全てのAPIエンドポイントに適切な認証機能が実装されている
+      - [ ] 認証なしでアクセス可能なエンドポイントが明確に定義・文書化されている
+      - [ ] JWTトークンまたはセッション管理が適切に実装されている
+      - [ ] 認証情報の有効期限とリフレッシュ機能が実装されている
+      - [ ] 権限に基づく認可（Authorization）が各エンドポイントで確認されている
+    rate_limiting:
+      - [ ] 全ての外部向けAPIエンドポイントにレート制限が実装されている
+      - [ ] AIエンドポイント: 3req/min per IP以下に制限されている
+      - [ ] 分析エンドポイント: 3req/min per IP以下に制限されている
+      - [ ] 認証エンドポイント: 3req/min per IP以下に制限されている
+      - [ ] レート制限超過時の適切なエラーメッセージ（429 Too Many Requests）が返される
+      - [ ] レート制限がIP、ユーザー、エンドポイント別に適切に設定されている
+    input_validation:
+      - [ ] 全てのユーザー入力に対して適切なバリデーションが実装されている
+      - [ ] プロンプト入力の最大長制限（5000文字以下）が実装されている
+      - [ ] GeoJSONデータの形式検証が実装されている
+      - [ ] SQLインジェクション対策が実装されている（該当する場合）
+      - [ ] XSS（クロスサイトスクリプティング）対策が全ての入力フィールドに実装されている
+      - [ ] CSRF（クロスサイトリクエストフォージェリ）対策が実装されている
+  prompt_security:
+    injection_prevention:
+      - [ ] プロンプトインジェクション攻撃の検出機能が実装されている
+      - [ ] 危険なパターン（ignore instructions, system prompt等）の検出が実装されている
+      - [ ] ユーザー入力のサニタイゼーション処理が実装されている
+      - [ ] プロンプトテンプレートがユーザー入力と明確に分離されている
+      - [ ] AIモデルへの指示とユーザーデータが混在しない構造になっている
+    content_filtering:
+      - [ ] 不適切なコンテンツ（暴力、性的、差別的内容）のフィルタリングが実装されている
+      - [ ] スパムや悪意のあるコンテンツの検出機能が実装されている
+      - [ ] プロンプトの内容ログが適切にマスキングされている（機密情報保護）
+  data_security:
+    sensitive_data:
+      - [ ] 個人情報や機密データが適切に暗号化されている
+      - [ ] APIキーや認証情報がログに出力されないよう配慮されている
+      - [ ] 環境変数が本番環境で適切に管理されている（Secret Manager等）
+      - [ ] データベース接続情報が安全に管理されている（該当する場合）
+    transmission_security:
+      - [ ] 全ての通信がHTTPS経由で行われている
+      - [ ] 適切なHTTPセキュリティヘッダーが設定されている（Helmet.js等）
+      - [ ] Cookie設定が安全（Secure, HttpOnly, SameSite）になっている
+      - [ ] CORS設定が適切で、不要なオリジンからのアクセスを防いでいる
+  error_handling_security:
+    information_disclosure:
+      - [ ] エラーメッセージから内部実装の詳細が漏洩しないよう配慮されている
+      - [ ] スタックトレースが本番環境でクライアントに返されない
+      - [ ] データベースエラーメッセージが直接クライアントに返されない
+      - [ ] 404エラーでディレクトリ構造が推測されないよう配慮されている
+    logging_security:
+      - [ ] セキュリティイベント（不正アクセス、認証失敗等）が適切にログ記録されている
+      - [ ] ログレベルが適切に設定されている（本番では機密情報をDEBUGレベルに）
+      - [ ] ログ改ざん防止機能が実装されている
+      - [ ] ログローテーションとアーカイブ機能が実装されている
+  dependency_security:
+    vulnerability_management:
+      - [ ] 依存ライブラリに既知の脆弱性がないかチェックされている（npm audit等）
+      - [ ] 定期的な依存関係の更新プロセスが確立されている
+      - [ ] 使用していないライブラリが削除されている
+      - [ ] サードパーティライブラリのライセンス確認が行われている
+  infrastructure_security:
+    server_hardening:
+      - [ ] 不要なHTTPメソッド（TRACE, OPTIONS等）が無効化されている
+      - [ ] サーバー情報（Server ヘッダー等）が隠蔽されている
+      - [ ] デフォルトポートが変更されている（該当する場合）
+      - [ ] ファイアウォール設定が適切に行われている
+    monitoring_alerting:
+      - [ ] セキュリティ監視機能が実装されている
+      - [ ] 異常なアクセスパターンの検出機能が実装されている
+      - [ ] インシデント対応手順が文書化されている
+      - [ ] セキュリティアラートの通知機能が実装されている
 
 # 5. パフォーマンス (Performance)
 performance:
@@ -79,6 +149,9 @@ performance:
   - [ ] CSSやJSファイルが圧縮（minify）されている
   - [ ] ブラウザのキャッシュが適切に活用されている
   - [ ] Lighthouseスコアで大きな問題（特にPerformance, Accessibility）が指摘されていない
+  - [ ] APIレスポンス時間が適切（95%のリクエストが2秒以内）
+  - [ ] 同時接続負荷テストが実施されている
+  - [ ] メモリリークが発生していない
 
 # 6. UI/UXとアクセシビリティ (UI/UX & Accessibility)
 ui_ux_accessibility:
@@ -95,6 +168,8 @@ git_and_deployment:
   - [ ] main/masterブランチが保護され、直接pushできないようになっている
   - [ ] 不要なブランチが定期的に削除されている
   - [ ] ビルドプロセスが自動化されており、誰でも同じ成果物を生成できる
+  - [ ] 本番デプロイ時のセキュリティチェックリストが運用されている
+  - [ ] 環境別の設定管理が適切に行われている
 
 # 8. ハッカソン特有項目 (Hackathon Specifics)
 hackathon_specific:
@@ -103,35 +178,128 @@ hackathon_specific:
   - [ ] READMEやプレゼン資料で、技術的な挑戦や工夫した点がアピールされている
   - [ ] ライセンス情報（MITなど）が明記されたLICENSEファイルが存在する
 
+# 9. テストとCI/CD (Testing & CI/CD) - 新規追加
+testing_cicd:
+  unit_testing:
+    - [ ] 重要なビジネスロジックに単体テストが実装されている
+    - [ ] テストカバレッジが85%以上達成されている
+    - [ ] セキュリティ機能（認証、バリデーション等）のテストが実装されている
+    - [ ] モック機能を活用して外部依存をテストで分離している
+  integration_testing:
+    - [ ] APIエンドポイントの統合テストが実装されている
+    - [ ] 正常ケースと異常ケースの両方がテストされている
+    - [ ] セキュリティ攻撃シナリオのテストが実装されている
+  security_testing:
+    - [ ] プロンプトインジェクション攻撃のテストが実装されている
+    - [ ] レート制限回避テストが実装されている
+    - [ ] 認証バイパステストが実装されている
+    - [ ] 入力検証回避テストが実装されている
+  cicd_pipeline:
+    - [ ] 自動テスト実行のCI/CDパイプラインが構築されている
+    - [ ] セキュリティスキャンが自動実行されている
+    - [ ] コード品質チェックが自動実行されている
+    - [ ] デプロイ前のセキュリティゲートが設定されている
+
 # アクションアイテム (Action Items)
 action_items:
+  critical_security:  # セキュリティ緊急対応
+    - item: "APIエンドポイントへのレート制限実装"
+      assigned_to: ""
+      deadline: ""
+      status: "未着手"
+    - item: "プロンプトインジェクション対策実装"
+      assigned_to: ""
+      deadline: ""
+      status: "未着手"
+    - item: "入力検証ミドルウェア実装"
+      assigned_to: ""
+      deadline: ""
+      status: "未着手"
   high_priority:  # 提出前に必須
-    - item: "（例）APIキーをサーバーサイド経由で呼び出すように修正"
+    - item: "認証・認可機能実装"
       assigned_to: ""
       deadline: ""
+      status: "未着手"
+    - item: "セキュリティログ記録機能実装"
+      assigned_to: ""
+      deadline: ""
+      status: "未着手"
+    - item: "server.jsのモジュール分割実装"
+      assigned_to: ""
+      deadline: ""
+      status: "未着手"
   medium_priority:  # できれば対応
-    - item: "（例）レスポンシブデザインの改善"
+    - item: "セキュリティテスト実装"
       assigned_to: ""
       deadline: ""
+      status: "未着手"
+    - item: "CI/CDパイプライン構築"
+      assigned_to: ""
+      deadline: ""
+      status: "未着手"
   low_priority:  # 時間があれば対応
-    - item: "（例）JSDocコメントの拡充"
+    - item: "セキュリティ監視ダッシュボード構築"
       assigned_to: ""
       deadline: ""
+      status: "未着手"
 
-# スコアリング（各セクション10点満点、合計80点）
+# スコアリング（各セクション10点満点、合計90点）
 scoring:
   project_structure: 0
   code_quality: 0
   gemini_integration: 0
-  security: 0
+  security: 0  # 重要度により配点増加
   performance: 0
   ui_ux_accessibility: 0
   git_and_deployment: 0
   hackathon_specific: 0
+  testing_cicd: 0
   total: 0
+
+# セキュリティリスク評価
+security_risk_assessment:
+  current_risk_level: "High"  # Critical/High/Medium/Low
+  identified_vulnerabilities:
+    critical: []
+    high: []
+    medium: []
+    low: []
+  risk_mitigation_timeline:
+    immediate: "レート制限、入力検証、認証機能"
+    short_term: "プロンプトインジェクション対策、ログ機能"
+    medium_term: "セキュリティテスト、監視機能"
+    long_term: "高度なセキュリティ機能、コンプライアンス対応"
+
+# 品質ゲート (Quality Gates)
+quality_gates:
+  security_gate:
+    - "Critical脆弱性: 0件"
+    - "High脆弱性: 0件"
+    - "認証機能: 100%実装"
+    - "入力検証: 100%実装"
+    - "レート制限: 100%実装"
+  performance_gate:
+    - "レスポンス時間: 95%が2秒以内"
+    - "テストカバレッジ: 85%以上"
+    - "Lighthouse Performance: 90点以上"
+  deployment_gate:
+    - "全テスト通過: 100%"
+    - "セキュリティスキャン: クリア"
+    - "コード品質チェック: クリア"
 
 # メモ・備考
 notes: |
   - 定期検診は、タイミングを決めて実施する。
+  - セキュリティ項目は最優先で対応する。
   - スコアは客観的な指標として活用し、低い項目から優先的に改善に取り組む。
+  - セキュリティリスクはCVSS v3.1基準で評価する。
   - 検診後はログを ./log/ へファイルを作成して記録する。日付_にちぢ_code_inspection.log というファイル名で保存する。
+  
+# 次回アップデート予定
+next_update:
+  version: "3.1"
+  planned_date: "Phase 1完了後"
+  planned_improvements:
+    - "TypeScript対応項目追加"
+    - "Zodバリデーション項目追加"
+    - "高度なセキュリティ機能項目追加"
