@@ -7,9 +7,13 @@ const cors = require('cors');
 const ee = require('@google/earthengine');
 const fs = require('fs');
 const rateLimit = require('express-rate-limit');
+const TokenLimiter = require('./js/modules/token-limiter');
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+// トークン使用量制限管理のインスタンス作成
+const tokenLimiter = new TokenLimiter();
 
 // ミドルウェアの設定
 app.use(cors({
@@ -656,6 +660,16 @@ async function handleVertexAIRequest(prompt, modelName) {
     throw new Error('サービスアカウント情報（GOOGLE_PRIVATE_KEY, GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY_ID）が設定されていません');
   }
 
+  // リクエスト前にトークン使用量制限をチェック
+  const estimatedTokens = Math.max(prompt.length * 0.75, 1000); // 概算: 文字数 * 0.75 + 最小1000
+  const limitCheck = tokenLimiter.checkLimit(modelName, estimatedTokens);
+  
+  if (!limitCheck.allowed) {
+    throw new Error(`トークン使用量制限に達しています: ${limitCheck.message}`);
+  }
+  
+  console.log(`トークン制限チェック通過: ${modelName} - ${limitCheck.message}`);
+
   // サービスアカウントキーオブジェクトを構成
   const serviceAccountKey = {
     type: 'service_account',
@@ -713,6 +727,23 @@ async function handleGeminiVertexRequest(vertexAI, prompt, modelName) {
 
   const result = await model.generateContent(request);
   const response = await result.response;
+  
+  // トークン使用量を記録
+  if (response.usageMetadata) {
+    const { inputTokens, outputTokens } = tokenLimiter.extractTokensFromUsage({
+      promptTokenCount: response.usageMetadata.promptTokenCount,
+      candidatesTokenCount: response.usageMetadata.candidatesTokenCount
+    });
+    await tokenLimiter.recordUsage(modelName, inputTokens, outputTokens);
+  } else {
+    console.warn('Vertex AIからの使用量情報が取得できませんでした');
+    // フォールバック: 概算で記録
+    const estimatedInputTokens = Math.ceil(prompt.length * 0.75);
+    const responseText = response.candidates[0].content.parts[0].text;
+    const estimatedOutputTokens = Math.ceil(responseText.length * 0.75);
+    await tokenLimiter.recordUsage(modelName, estimatedInputTokens, estimatedOutputTokens);
+  }
+  
   return response.candidates[0].content.parts[0].text;
 }
 
@@ -733,6 +764,23 @@ async function handleGemmaRequest(vertexAI, prompt, modelName) {
   });
 
   const response = await result.response;
+  
+  // トークン使用量を記録
+  if (response.usageMetadata) {
+    const { inputTokens, outputTokens } = tokenLimiter.extractTokensFromUsage({
+      promptTokenCount: response.usageMetadata.promptTokenCount,
+      candidatesTokenCount: response.usageMetadata.candidatesTokenCount
+    });
+    await tokenLimiter.recordUsage(modelName, inputTokens, outputTokens);
+  } else {
+    console.warn('Vertex AIからの使用量情報が取得できませんでした');
+    // フォールバック: 概算で記録
+    const estimatedInputTokens = Math.ceil(prompt.length * 0.75);
+    const responseText = response.candidates[0].content.parts[0].text;
+    const estimatedOutputTokens = Math.ceil(responseText.length * 0.75);
+    await tokenLimiter.recordUsage(modelName, estimatedInputTokens, estimatedOutputTokens);
+  }
+  
   return response.candidates[0].content.parts[0].text;
 }
 
@@ -944,6 +992,8 @@ app.get('/api/gemini-test', aiApiRateLimit, async (req, res) => {
 
 // クライアントにサーバー環境の基本情報を提供（APIキーは含まない）
 app.get('/api/server-info', aiApiRateLimit, (req, res) => {
+  const usageStatus = tokenLimiter.getUsageStatus();
+  
   res.json({
     hasGeminiKey: !!process.env.GEMINI_API_KEY,
     serverMode: process.env.NODE_ENV || 'development',
@@ -952,6 +1002,27 @@ app.get('/api/server-info', aiApiRateLimit, (req, res) => {
       defaultModel: AI_MODEL,
       region: GOOGLE_CLOUD_REGION,
       hasVertexAI: !!(GOOGLE_PROJECT_ID && GOOGLE_PRIVATE_KEY && GOOGLE_CLIENT_EMAIL)
-    }
+    },
+    tokenUsage: usageStatus
   });
+});
+
+// トークン使用状況を詳細表示するAPIエンドポイント
+app.get('/api/token-usage', (req, res) => {
+  try {
+    const usageStatus = tokenLimiter.getUsageStatus();
+    res.json({
+      success: true,
+      data: usageStatus,
+      timestamp: new Date().toISOString(),
+      timezone: 'Asia/Tokyo'
+    });
+  } catch (error) {
+    console.error('トークン使用状況取得エラー:', error);
+    res.status(500).json({
+      success: false,
+      error: 'トークン使用状況の取得に失敗しました',
+      message: error.message
+    });
+  }
 }); 
