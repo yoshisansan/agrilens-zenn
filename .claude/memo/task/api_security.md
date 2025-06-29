@@ -78,8 +78,8 @@ AgriLensのAPIセキュリティ脆弱性を解決し、production-readyなセ�
   - 成果物: レート制限ミドルウェア
   - テスト: レート制限動作テスト
   - 設定値: 
-    - AI API: 10req/min per IP
-    - 分析API: 5req/min per IP
+    - AI API: 3req/min per IP
+    - 分析API: 3req/min per IP
     - 認証API: 3req/min per IP
 
 - [ ] **Task 1.3.2**: `src/middleware/validation.js` 作成
