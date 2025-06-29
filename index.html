@@ -5,113 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AgriLens - AI畑ヘルスチェックドクター</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            important: false,
+            corePlugins: {
+                preflight: false,
+            },
+            blocklist: ['suggested-questions-container', 'suggested-questions-header', 'suggested-questions-title', 'suggested-questions-buttons', 'suggested-question-btn']
+        }
+    </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/variables.css">
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/map.css">
+    <!-- AI Chat CSS must be loaded after Tailwind to override styles -->
     <link rel="stylesheet" href="css/ai-chat.css">
-    <style>
-        #map { height: 500px; }
-        .ndvi-legend {
-            background: linear-gradient(to right, var(--color-error-600), var(--color-warning-500), var(--color-success-600));
-        }
-        /* Typing animation for dashboard chat */
-        .typing-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: #10b981;
-            animation: typing 1.4s infinite ease-in-out;
-        }
-        .typing-dot:nth-child(1) {
-            animation-delay: 0s;
-        }
-        .typing-dot:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-        .typing-dot:nth-child(3) {
-            animation-delay: 0.4s;
-        }
-        @keyframes typing {
-            0%, 80%, 100% {
-                transform: scale(0);
-                opacity: 0.5;
-            }
-            40% {
-                transform: scale(1);
-                opacity: 1;
-            }
-        }
-        .drawing-controls {
-            transition: all 0.3s ease;
-        }
-        .sidebar {
-            transition: all 0.3s ease;
-        }
-        @media (max-width: 768px) {
-            .sidebar {
-                position: absolute;
-                z-index: 1000;
-                width: 80%;
-                left: -100%; /* 初期状態は隠す */
-                height: 100%; /* 高さを確保 */
-                overflow-y: auto; /* スクロール可能に */
-            }
-            .sidebar.open {
-                left: 0;
-            }
-            /* Sidebar open時に背景を暗くするオーバーレイ */
-            body.sidebar-open::before {
-                content: '';
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background-color: rgba(0, 0, 0, 0.5);
-                z-index: 999; /* Sidebarより下 */
-            }
-        }
-        /* Leaflet.draw のツールバーアイコンの色などを調整 */
-        .leaflet-draw-toolbar a {
-            background-color: white;
-            color: #333;
-            border: 1px solid #ccc;
-        }
-        .leaflet-draw-toolbar a:hover {
-            background-color: #f4f4f4;
-        }
-        .leaflet-touch .leaflet-draw-toolbar a {
-             border: 1px solid rgba(0,0,0,0.2);
-             background-clip: padding-box;
-        }
-         /* 処理中モーダルのプログレスバー */
-        #progressBarContainer {
-             width: 100%;
-             background-color: #e0e0e0;
-             border-radius: 9999px;
-             height: 10px; /* h-2.5 */
-             overflow: hidden; /* 角丸を反映させるため */
-        }
-        #progressBar {
-             height: 100%;
-             background-color: #16a34a; /* bg-green-600 */
-             border-radius: 9999px;
-             transition: width 0.3s ease; /* アニメーション */
-        }
-        /* トースト通知のアニメーション */
-        #toast.show {
-            transform: translateY(0);
-            opacity: 1;
-        }
-    </style>
+
 </head>
-<body class="bg-gray-50">
+<body class="bg-gray-50" style="margin: 0; padding: 0;">
     <!-- Header -->
-    <header class="bg-green-700 text-white shadow-md">
-        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+    <header class="bg-green-700 text-white shadow-md" style="margin: 0; padding: 0;">
+        <div class="px-4 py-3 flex justify-between items-center" style="margin: 0; max-width: 100%; width: 100%">
             <div class="flex items-center space-x-2">
                 <img src="assets/logo.png" alt="AgriLens Logo" class="h-8 w-auto">
                 <h1 class="text-xl font-bold">AgriLens デモ版</h1>
@@ -173,12 +89,14 @@
         <div id="sidebar" class="sidebar bg-white shadow-lg rounded-lg md:w-1/4 p-4 mb-4 md:mb-0 md:mr-4 md:relative md:left-0 md:h-auto">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-lg font-semibold text-gray-800">マイ圃場</h2>
-                <button id="closeSidebarBtn" class="md:hidden text-gray-600 hover:text-gray-800">
-                    <i class="fas fa-times text-xl"></i>
-                </button>
-                <button id="addDirectoryBtn" class="hidden md:inline-block bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md text-sm">
-                    <i class="fas fa-folder-plus mr-1"></i> リスト追加
-                </button>
+                <div class="flex items-center space-x-2">
+                    <button id="closeSidebarBtn" class="md:hidden text-gray-600 hover:text-gray-800">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                    <button id="addDirectoryBtn" class="hidden md:inline-block bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md text-sm">
+                        <i class="fas fa-folder-plus mr-1"></i> リスト追加
+                    </button>
+                </div>
             </div>
             <button id="addDirectoryBtnMobile" class="md:hidden w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm mb-4">
                 <i class="fas fa-folder-plus mr-1"></i> リスト追加
@@ -187,24 +105,24 @@
             <!-- Search & Filter -->
             <div class="mb-3">
                 <div class="relative">
-                    <input type="text" id="fieldSearchInput" placeholder="圃場を検索..." class="w-full px-3 py-2 border rounded-md text-sm">
-                    <button id="fieldSearchBtn" class="absolute right-2 top-2 text-gray-500">
-                        <i class="fas fa-search"></i>
+                    <input type="text" id="fieldSearchInput" placeholder="圃場を検索..." class="w-full px-3 py-2 pr-10 border rounded-md text-sm">
+                    <button id="fieldSearchBtn" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-search text-sm"></i>
                     </button>
                 </div>
                 <div class="flex justify-between items-center mt-2 text-xs text-gray-500">
-                    <div>
-                        <select id="fieldSortSelect" class="text-xs border rounded px-1 py-0.5">
+                    <div class="flex items-center space-x-1">
+                        <select id="fieldSortSelect" class="text-xs border rounded px-2 py-1 bg-white">
                             <option value="updatedAt">更新日時</option>
                             <option value="name">名前</option>
                             <option value="createdAt">作成日時</option>
                         </select>
-                        <button id="sortOrderBtn" class="px-1 py-0.5 border rounded ml-1">
-                            <i class="fas fa-sort-amount-down"></i>
+                        <button id="sortOrderBtn" class="px-2 py-1 border rounded bg-white hover:bg-gray-50">
+                            <i class="fas fa-sort-amount-down text-xs"></i>
                         </button>
                     </div>
-                    <button id="viewModeBtn" class="px-1 py-0.5 border rounded">
-                        <i class="fas fa-th-list"></i>
+                    <button id="viewModeBtn" class="px-2 py-1 border rounded bg-white hover:bg-gray-50">
+                        <i class="fas fa-th-list text-xs"></i>
                     </button>
                 </div>
             </div>
@@ -489,68 +407,67 @@
 
             <!-- AI Assistant (positioned below analysis results when shown, otherwise before history) -->
             <div class="bg-white shadow-lg rounded-lg p-4 mb-4">
-                <div class="flex items-center space-x-2 mb-2">
+                <div class="flex items-center space-x-2 mb-4">
                     <h2 class="text-lg font-semibold text-gray-800">AI アシスタント</h2>
                     <span class="text-sm text-gray-600">(チャット形式で農業アドバイスを提供します)</span>
                 </div>
-                <div class="flex flex-col space-y-3">
-                    <!-- Analysis History Selection -->
-                    <div id="aiAssistantHistorySelection" class="border border-gray-200 rounded-md p-3 bg-gray-50">
-                        <div class="flex items-center justify-between mb-2">
-                            <label class="text-sm font-medium text-gray-700">参照する分析データを選択 (複数選択可)</label>
-                            <button onclick="refreshAiAssistantHistory()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition-colors">
-                                <i class="fas fa-sync-alt mr-1"></i>更新
-                            </button>
-                        </div>
-                        <div id="aiHistoryCheckboxes" class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-                            <!-- 分析履歴のチェックボックスが動的に挿入される -->
-                        </div>
-                        <div id="aiHistoryEmpty" class="text-center py-2 text-gray-500 text-sm hidden">
-                            分析履歴がありません
-                        </div>
-                        <div class="mt-2 text-xs text-gray-500">
-                            <span id="selectedAnalysisCount">0</span>件選択中
-                        </div>
+                
+                <!-- 参照する分析データを選択 -->
+                <div id="aiAssistantHistorySelection" class="border border-gray-200 rounded-md p-3 bg-gray-50 mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-sm font-medium text-gray-700">参照する分析データを選択 (複数選択可)</label>
+                        <button onclick="refreshAiAssistantHistory()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition-colors">
+                            <i class="fas fa-sync-alt mr-1"></i>更新
+                        </button>
                     </div>
-                    
-                    <!-- Chat Interface -->
-                    <div id="dashboardChatContainer" class="border border-gray-200 rounded-md">
-                        <!-- Chat Messages -->
-                        <div id="dashboardChatMessages" class="h-64 overflow-y-auto p-3 bg-gray-50 space-y-3">
-                            <!-- Welcome message -->
-                            <div class="chat-message ai-message">
-                                <div class="flex items-start">
-                                    <div class="flex-shrink-0">
-                                        <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                                            <i class="fas fa-robot text-green-500"></i>
-                                        </div>
-                                    </div>
-                                    <div class="ml-3 bg-green-100 rounded-lg py-2 px-3 max-w-[85%]">
-                                        <p class="text-sm text-gray-800">こんにちは！農地分析AIアシスタントです。圃場データの分析や作物の健康状態について質問してください。</p>
-                                    </div>
-                                </div>
+                    <div id="aiHistoryCheckboxes" class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+                        <!-- 分析履歴のチェックボックスが動的に挿入される -->
+                    </div>
+                    <div id="aiHistoryEmpty" class="text-center py-2 text-gray-500 text-sm hidden">
+                        分析履歴がありません
+                    </div>
+                    <div class="mt-2 text-xs text-gray-500">
+                        <span id="selectedAnalysisCount">0</span>件選択中
+                    </div>
+                </div>
+
+                <!-- OR区切り -->
+                <div class="text-center text-sm text-gray-500 mb-4">OR質問例</div>
+                
+                <!-- Welcome message - シンプル版 -->
+                <div class="mb-4">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                            <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                                <i class="fas fa-robot text-green-500"></i>
                             </div>
                         </div>
-                        
-                        <!-- Chat Input -->
-                        <div class="border-t border-gray-200 p-3 bg-white">
-                            <div class="flex items-center space-x-2">
-                                <input 
-                                    type="text" 
-                                    id="dashboardChatInput" 
-                                    placeholder="圃場や作物について質問してください..." 
-                                    class="flex-1 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                    autocomplete="off"
-                                >
-                                <button id="dashboardChatSend" class="bg-green-600 hover:bg-green-700 text-white p-2 rounded-md">
-                                    <i class="fas fa-paper-plane"></i>
-                                </button>
-                                <button id="dashboardChatClear" class="text-gray-400 hover:text-gray-600 p-2" title="チャット履歴をクリア">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                            </div>
+                        <div class="ml-3 bg-green-100 rounded-lg py-2 px-3">
+                            <p class="text-sm text-gray-800">こんにちは！農地分析AIアシスタントです。圃場データの分析や作物の健康状態について質問してください。</p>
                         </div>
                     </div>
+                </div>
+                
+                <!-- Chat Input - シンプル版 -->
+                <div class="flex items-center space-x-2">
+                    <input 
+                        type="text" 
+                        id="dashboardChatInput" 
+                        placeholder="圃場や作物について質問してください..." 
+                        class="flex-1 border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        autocomplete="off"
+                    >
+                    <button id="dashboardChatSend" class="bg-green-600 hover:bg-green-700 text-white p-2 rounded-md">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                    <button id="dashboardChatClear" class="text-gray-400 hover:text-gray-600 p-2" title="チャット履歴をクリア">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+                
+                <!-- Hidden chat messages container for dynamic content -->
+                <div id="dashboardChatMessages" class="hidden mt-4 space-y-3">
+                    <!-- Chat messages will be inserted here dynamically -->
                 </div>
             </div>
 
@@ -688,6 +605,343 @@
             100% {
                 box-shadow: 0 0 0 0 rgba(250, 204, 21, 0);
             }
+        }
+        
+        /* おすすめ質問のスタイル - 確実にCSSを適用 */
+        .suggested-questions-container {
+            margin: 10px 0 !important;
+            padding: 12px !important;
+            background-color: #fef7e6 !important;
+            border: 1px solid #fbbf24 !important;
+            border-radius: 8px !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+        
+        .suggested-questions-header {
+            display: flex !important;
+            align-items: center !important;
+            margin-bottom: 8px !important;
+        }
+        
+        .suggested-questions-title {
+            margin-left: 6px !important;
+            font-size: 0.85rem !important;
+            font-weight: 600 !important;
+            color: #92400e !important;
+        }
+        
+        .suggested-questions-buttons {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 6px !important;
+        }
+        
+        .suggested-question-btn {
+            background-color: #ffffff !important;
+            border: none !important;
+            border-radius: 6px !important;
+            padding: 8px 12px !important;
+            text-align: left !important;
+            font-size: 0.8rem !important;
+            color: #374151 !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+            line-height: 1.4 !important;
+            display: block !important;
+            width: 100% !important;
+            margin: 0 !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+        }
+        
+        .suggested-question-btn:hover {
+            background-color: #f3f4f6 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+        }
+        
+        /* サイドバー内の入力要素のはみ出し修正 */
+        #sidebar input, #sidebar textarea, #sidebar select {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        
+        #sidebar .space-y-3 > div {
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        
+        /* フィールド検索入力の調整 */
+        #fieldSearchInput {
+            width: 100% !important;
+            box-sizing: border-box !important;
+            padding-right: 40px !important;
+        }
+        
+        /* 検索ボタンの調整 */
+        #fieldSearchBtn {
+            position: absolute !important;
+            right: 12px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            border: none !important;
+            background: none !important;
+            padding: 4px !important;
+            cursor: pointer !important;
+        }
+        
+        /* フィルターボタンの調整 */
+        #fieldSortSelect, #sortOrderBtn, #viewModeBtn {
+            font-size: 11px !important;
+            padding: 4px 8px !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 4px !important;
+            background-color: white !important;
+            color: #374151 !important;
+            height: 28px !important;
+            line-height: 1 !important;
+        }
+        
+        #fieldSortSelect:hover, #sortOrderBtn:hover, #viewModeBtn:hover {
+            background-color: #f9fafb !important;
+            border-color: #9ca3af !important;
+        }
+        
+        /* フィルターエリアの配置調整 */
+        .flex.justify-between.items-center {
+            align-items: center !important;
+            gap: 8px !important;
+        }
+        
+        .flex.items-center.space-x-1 {
+            display: flex !important;
+            align-items: center !important;
+            gap: 4px !important;
+        }
+        
+        /* セレクトボックスの調整 */
+        #fieldSortSelect, #fieldDirectorySelect {
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        
+        /* チェックボックスのサイズ調整 */
+        .field-select-checkbox {
+            width: 20px !important;
+            height: 20px !important;
+            margin-right: 8px !important;
+            flex-shrink: 0 !important;
+        }
+        
+        /* チェックボックスの左寄せ修正 */
+        .field-select-checkbox {
+            margin-right: 8px !important;
+            align-self: flex-start !important;
+            margin-left: 0 !important;
+            margin-top: 0 !important;
+            position: relative !important;
+            left: 0 !important;
+            width: 16px !important;
+            height: 16px !important;
+            flex-shrink: 0 !important;
+        }
+        
+        /* 区画アイテムのスタイル修正 */
+        .field-item {
+            background-color: #ffffff !important;
+            border: 1px solid #e5e7eb !important;
+            border-left: 4px solid #d1d5db !important;
+            border-radius: 8px !important;
+            padding: 12px !important;
+            margin-bottom: 8px !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        .field-item:hover {
+            background-color: #f9fafb !important;
+            border-color: #9ca3af !important;
+            border-left-color: #6b7280 !important;
+        }
+        
+        .field-item.selected, .field-item.bg-blue-50 {
+            background-color: #eff6ff !important;
+            border-color: #93c5fd !important;
+            border-left-color: #3b82f6 !important;
+        }
+        
+        /* 現在表示中の区画（ring-2 ring-green-500クラス） */
+        .field-item.ring-2.ring-green-500 {
+            background-color: #f0fdf4 !important;
+            border-color: #86efac !important;
+            border-left-color: #22c55e !important;
+            box-shadow: 0 0 0 2px #22c55e !important;
+        }
+        
+        /* 区画名の見出しスタイル */
+        .field-item h3 {
+            font-size: 14px !important;
+            font-weight: 600 !important;
+            color: #1f2937 !important;
+            margin: 0 !important;
+            line-height: 1.4 !important;
+        }
+        
+        /* 圃場アイテム内のフレックス配置調整 */
+        .field-item .flex.items-center {
+            align-items: center !important;
+            justify-content: flex-start !important;
+        }
+        
+        .field-item .flex-1 {
+            flex: 1 !important;
+            min-width: 0 !important;
+        }
+        
+        /* h3要素（区画名）のスタイルをより強力に適用 */
+        #sidebar .field-item h3,
+        .sidebar .field-item h3,
+        .field-item h3.font-medium {
+            font-size: 14px !important;
+            font-weight: 600 !important;
+            color: #1f2937 !important;
+            margin: 0 !important;
+            line-height: 1.4 !important;
+            display: inline !important;
+        }
+        
+        /* Tailwindの.font-mediumクラスを上書き */
+        .font-medium {
+            font-weight: 500;
+        }
+        
+        .field-item .font-medium {
+            font-weight: 600 !important;
+            font-size: 14px !important;
+        }
+        
+        /* チェックボックスを含む要素の配置調整 */
+        .flex.items-center {
+            justify-content: flex-start !important;
+            align-items: center !important;
+        }
+        
+        /* 特にサイドバー内のflexアイテムの調整 */
+        #sidebar .flex.items-center {
+            justify-content: flex-start !important;
+            align-items: center !important;
+        }
+        
+        /* 圃場アイテムのボタン表示エリア */
+        #sidebar .flex.justify-end {
+            display: flex !important;
+            justify-content: flex-end !important;
+            align-items: center !important;
+            margin-top: 8px !important;
+            gap: 4px !important;
+        }
+        
+        /* すべてのボタンスタイルをリセットして移行前のデザインに戻す（おすすめ質問ボタンと特定クラスは除外） */
+        button:not(.suggested-question-btn):not(.bg-green-600):not(.bg-blue-600):not(.bg-red-500):not(.bg-yellow-500) {
+            border: 1px solid #d1d5db !important;
+            background-color: #ffffff !important;
+            color: #374151 !important;
+        }
+        
+        button:not(.suggested-question-btn):not(.bg-green-600):not(.bg-blue-600):not(.bg-red-500):not(.bg-yellow-500):hover {
+            background-color: #f9fafb !important;
+            border-color: #9ca3af !important;
+        }
+        
+        /* 特定のボタンスタイルは個別に設定 */
+        .bg-green-600 {
+            background-color: #059669 !important;
+            color: white !important;
+            border: none !important;
+        }
+        
+        .bg-green-600:hover {
+            background-color: #047857 !important;
+        }
+        
+        .bg-blue-600 {
+            background-color: #2563eb !important;
+            color: white !important;
+            border: none !important;
+        }
+        
+        .bg-blue-600:hover {
+            background-color: #1d4ed8 !important;
+        }
+        
+        .bg-red-500 {
+            background-color: #ef4444 !important;
+            color: white !important;
+            border: none !important;
+        }
+        
+        .bg-red-500:hover {
+            background-color: #dc2626 !important;
+        }
+        
+        /* サイドバー内の小さなボタンスタイル */
+        .field-view-btn, .field-analyze-btn, .field-edit-btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 4px 8px !important;
+            font-size: 12px !important;
+            border-radius: 4px !important;
+            border: 1px solid #d1d5db !important;
+            background-color: #f3f4f6 !important;
+            color: #374151 !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        .field-view-btn:hover, .field-analyze-btn:hover, .field-edit-btn:hover {
+            background-color: #e5e7eb !important;
+            border-color: #9ca3af !important;
+        }
+        
+        /* bg-gray-100などのクラスが適用されたボタンも正しく表示 */
+        .bg-gray-100 {
+            background-color: #f3f4f6 !important;
+            color: #374151 !important;
+            border: 1px solid #d1d5db !important;
+        }
+        
+        .bg-blue-100 {
+            background-color: #dbeafe !important;
+            color: #1e40af !important;
+            border: 1px solid #93c5fd !important;
+        }
+        
+        .bg-gray-100:hover {
+            background-color: #e5e7eb !important;
+        }
+        
+        .bg-blue-100:hover {
+            background-color: #bfdbfe !important;
+        }
+        
+        /* 黒い境界線を削除する追加CSS */
+        * {
+            box-sizing: border-box;
+        }
+        
+        button, input, select, textarea {
+            outline: none !important;
+        }
+        
+        button:focus, input:focus, select:focus, textarea:focus {
+            outline: none !important;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5) !important;
+        }
+        
+        /* ダークボーダーを強制的に削除 */
+        .border-gray-800, .border-gray-900, .border-black {
+            border-color: #d1d5db !important;
         }
     </style>
 </body>

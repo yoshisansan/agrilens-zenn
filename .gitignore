@@ -4,3 +4,4 @@
 service_credential.json
 node_modules/
 .next/
+.claude/zenn/

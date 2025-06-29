@@ -145,6 +145,12 @@ function setupTabsEventListeners() {
 // 認証状態の確認
 async function checkAuthStatus() {
     try {
+        // デモ版: 認証チェックをスキップし、常に認証済みとして扱う
+        console.log('[DEMO MODE] 認証チェックをスキップしています');
+        return;
+        
+        // 以下は本来の認証チェック処理（デモ版では無効化）
+        /*
         const response = await fetch('/api/auth-status');
         const data = await response.json();
         
@@ -161,8 +167,9 @@ async function checkAuthStatus() {
                 }, { once: true });
             }
         }
+        */
     } catch (error) {
-        console.error('認証状態の確認に失敗しました:', error);
+        console.error('[DEMO MODE] 認証状態の確認をスキップしました:', error);
     }
 }
 

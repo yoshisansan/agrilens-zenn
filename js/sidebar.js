@@ -220,6 +220,15 @@ function renderDirectoriesList() {
     // HTMLの作成
     let html = '';
     
+    // 新規圃場追加ボタンをディレクトリリストの直上に配置
+    html += `
+        <div class="add-new-field-global-container mb-4">
+            <button class="add-new-field-global-btn w-full text-sm bg-green-100 text-green-800 px-3 py-3 rounded-lg hover:bg-green-200 flex items-center justify-center font-medium">
+                <i class="fas fa-plus mr-2"></i> 新規圃場追加+
+            </button>
+        </div>
+    `;
+    
     // 各ディレクトリ項目の作成
     sortedDirectories.forEach(dir => {
         const isActive = dir.id === currentDirectoryId;
@@ -293,21 +302,11 @@ function renderDirectoriesList() {
                         </div>
                     </div>
                     
-                    <div class="flex justify-end mt-1">
-                        <button class="add-field-btn text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200">
-                            <i class="fas fa-plus mr-1"></i> 新規
-                        </button>
-                    </div>
                 </div>
                 
                 <!-- ディレクトリ内の区画一覧 (このディレクトリがアクティブな場合のみ表示) -->
                 <div class="fields-container ${isActive ? '' : 'hidden'} pl-3 mt-2 space-y-2">
                     ${fields.length === 0 ? `
-                        <div class="add-new-field-container mb-2">
-                            <button class="add-new-field-btn w-full text-xs bg-green-100 text-green-800 px-2 py-2 rounded hover:bg-green-200 flex items-center justify-center">
-                                <i class="fas fa-plus mr-1"></i> 新規区画を追加
-                            </button>
-                        </div>
                         <div class="text-xs text-gray-500 py-2 pl-2 italic">
                             区画がありません
                         </div>
@@ -320,6 +319,9 @@ function renderDirectoriesList() {
     });
     
     directoriesList.innerHTML = html;
+    
+    // 新規圃場追加ボタンのイベントリスナーを設定
+    setupGlobalAddFieldButtonEventListener();
     
     // ディレクトリアイテムのイベントリスナーを設定
     setupDirectoryItemEventListeners();
@@ -347,32 +349,16 @@ function renderFieldsInDirectory(fields) {
     // ソート
     fields = sortFields(fields, currentSortBy, currentSortOrder);
     
-    // 新規区画追加ボタンをリストの最上部に表示
-    let html = `
-        <div class="add-new-field-container mb-2">
-            <button class="add-new-field-btn w-full text-xs bg-green-100 text-green-800 px-2 py-2 rounded hover:bg-green-200 flex items-center justify-center">
-                <i class="fas fa-plus mr-1"></i> 新規区画を追加
-            </button>
-        </div>
-    `;
-    
-    // 新規区画フォームがすでに表示されている場合は、ここで非表示にする
-    // これにより、renderFieldsList()が呼ばれるたびにフォームが元の位置に戻るのを防ぐ
-    if (newFieldForm && !newFieldForm.classList.contains('hidden')) {
-        newFieldForm.classList.add('hidden');
-        // showNewFieldForm()を呼び出して適切な位置に再表示
-        setTimeout(() => showNewFieldForm(), 0);
-    }
-    
     // 結果が空の場合
     if (fields.length === 0) {
-        html += `
+        return `
             <div class="text-xs text-gray-500 py-2 pl-2 italic">
                 ${searchTerm ? '検索条件に一致する区画がありません。' : '区画がありません。'}
             </div>
         `;
-        return html;
     }
+    
+    let html = '';
     
     // リスト表示
     fields.forEach(field => {
@@ -591,6 +577,17 @@ function setupDirectoryItemEventListeners() {
     });
 }
 
+// グローバル新規圃場追加ボタンのイベントリスナー設定
+function setupGlobalAddFieldButtonEventListener() {
+    const globalAddFieldBtn = document.querySelector('.add-new-field-global-btn');
+    if (globalAddFieldBtn) {
+        globalAddFieldBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            showNewFieldForm();
+        });
+    }
+}
+
 // ディレクトリ名編集開始の共通処理
 function startDirectoryEdit(nameElement, directoryId) {
     // 代わりにインライン編集フォームを表示する
@@ -723,13 +720,6 @@ function setupFieldItemEventListeners() {
         });
     });
     
-    // 新規区画追加ボタンのイベント
-    document.querySelectorAll('.add-new-field-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            showNewFieldForm();
-        });
-    });
     
     // フィールドアイテムのクリックイベント
     document.querySelectorAll('.field-item').forEach(item => {
@@ -1062,17 +1052,17 @@ function showNewFieldForm() {
     updateDirectorySelect(fieldDirectorySelect, currentDirectoryId);
     
     if (newFieldForm) {
-        // フォームを表示する前に、「新規追加」ボタンの位置までスクロール
-        const addNewFieldBtn = document.querySelector('.add-new-field-btn');
-        if (addNewFieldBtn) {
-            addNewFieldBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // フォームを表示する前に、グローバル新規追加ボタンの位置までスクロール
+        const globalAddFieldBtn = document.querySelector('.add-new-field-global-btn');
+        if (globalAddFieldBtn) {
+            globalAddFieldBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
         
-        // フォームを「新規追加」ボタンの直後に移動
-        const addNewFieldContainer = document.querySelector('.add-new-field-container');
-        if (addNewFieldContainer && addNewFieldContainer.parentNode) {
+        // フォームをグローバル新規追加ボタンの直後に移動
+        const globalAddFieldContainer = document.querySelector('.add-new-field-global-container');
+        if (globalAddFieldContainer && globalAddFieldContainer.parentNode) {
             // フォームをボタンの直後に挿入
-            addNewFieldContainer.parentNode.insertBefore(newFieldForm, addNewFieldContainer.nextSibling);
+            globalAddFieldContainer.parentNode.insertBefore(newFieldForm, globalAddFieldContainer.nextSibling);
         }
         
         newFieldForm.classList.remove('hidden');

@@ -313,6 +313,4 @@ next_update:
   version: "3.1"
   planned_date: "Phase 1完了後"
   planned_improvements:
-    - "TypeScript対応項目追加"
-    - "Zodバリデーション項目追加"
     - "高度なセキュリティ機能項目追加"

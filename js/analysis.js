@@ -1,70 +1,60 @@
 // 分析データの取得（サーバーサイドAPIを使用）
 async function fetchGEEAnalysis(aoiGeoJSON) {
-    console.log("Sending AOI to server:", aoiGeoJSON);
-    showProcessingModal("圃場分析を処理中", "Google Earth Engineに接続しています...");
+    console.log('[DEBUG] fetchGEEAnalysis開始');
     
-    // 実際の処理状況を反映するプログレスバー（初期値）
-    updateProgressBar(10);
+    showProcessingModal("圃場分析を処理中", "Google Earth Engineからデータを取得しています...");
+    
+    const analysisData = {
+        aoiGeoJSON: aoiGeoJSON,
+        dateStart: '2023-06-01',
+        dateEnd: '2023-09-30'
+    };
 
     try {
-        // GeoJSONデータの検証
-        if (!aoiGeoJSON) {
-            hideProcessingModal(); // 処理中モーダルを明示的に閉じる
-            throw new Error("GeoJSONデータがありません");
-        }
-        
-        // GeoJSONのFeatureからジオメトリを抽出
-        let geometryData = aoiGeoJSON;
-        
-        // Featureの場合、ジオメトリを抽出
-        if (aoiGeoJSON.type === 'Feature' && aoiGeoJSON.geometry) {
-            geometryData = aoiGeoJSON.geometry;
-            console.log('Featureからジオメトリを抽出:', geometryData.type);
-        }
-        
-        // 座標データの確認
-        if (!geometryData.coordinates || !Array.isArray(geometryData.coordinates)) {
-            console.error('無効な座標データ:', geometryData);
-            hideProcessingModal(); // 処理中モーダルを明示的に閉じる
-            throw new Error("座標データがないか無効です");
-        }
-        
-        console.log('GEEに送信するジオメトリデータ:', JSON.stringify(geometryData));
         updateProgressBar(20);
-        showProcessingModal("圃場分析を処理中", "GEEで衛星画像を検索中...");
-
-        // リクエストの作成と送信
-        const requestBody = { aoiGeoJSON: geometryData };
-        console.log('送信リクエスト:', JSON.stringify(requestBody));
-        updateProgressBar(30);
-
-        const response = await fetch('/api/analyze', {
+        console.log('[DEBUG] GEE分析APIにリクエスト送信');
+        
+        const response = await fetch('/api/analysis', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify(analysisData)
         });
 
         updateProgressBar(70);
-        showProcessingModal("圃場分析を処理中", "GEEからのデータを処理中...");
+        console.log('[DEBUG] GEE分析APIレスポンス受信:', response.status);
+        
+        let responseData;
+        try {
+            responseData = await response.json();
+        } catch (parseError) {
+            console.error('[DEBUG] レスポンス解析エラー:', parseError);
+            throw new Error('サーバーからの応答を解析できませんでした');
+        }
 
-        // ステータスコードとレスポンスデータを取得
-        const responseData = await response.json();
-        console.log('GEEからのレスポンス:', responseData);
         updateProgressBar(90);
 
         if (!response.ok) {
             hideProcessingModal(); // 処理中モーダルを明示的に閉じる
             
             if (response.status === 401) {
-                // 認証が必要な場合、認証ページにリダイレクト
-                window.location.href = '/auth';
-                return;
+                // デモ版: 認証が必要な場合でもモックデータで処理を継続
+                console.log('[DEMO MODE] 認証エラーが発生しましたが、モックデータで処理を継続します');
+                showToast("デモモード", "認証が必要ですが、デモ版ではモックデータで処理を継続します");
+                return createLocalMockData(aoiGeoJSON);
+            }
+            
+            if (response.status === 400) {
+                // デモ版: バリデーションエラーもモックデータで処理を継続
+                console.log('[DEMO MODE] バリデーションエラーが発生しましたが、モックデータで処理を継続します');
+                const errorMsg = responseData.message || 'バリデーションエラー';
+                showToast("デモモード", `${errorMsg}のため、モックデータで処理を継続します`);
+                return createLocalMockData(aoiGeoJSON);
             }
             
             // サーバーから返されたエラーメッセージを表示
-            const errorMessage = responseData.error || `HTTP error! status: ${response.status}`;
+            const errorMessage = responseData.message || responseData.error || `HTTP error! status: ${response.status}`;
             const errorDetails = responseData.details || '';
             
             showToast("エラーが発生しました", `${errorMessage}\n${errorDetails}`);
@@ -93,6 +83,103 @@ async function fetchGEEAnalysis(aoiGeoJSON) {
         showToast("エラーが発生しました", `GEE分析中にエラーが発生しました: ${error.message}`);
         throw error;
     }
+}
+
+// デモ版用のローカルモックデータ生成関数
+function createLocalMockData(aoiGeoJSON) {
+    console.log('[DEMO MODE] ローカルモックデータを生成中...');
+    
+    // ハッシュ値に基づいたモックデータ生成（一貫性のある値を生成するため）
+    const getHashValue = (coordinates) => {
+        const str = JSON.stringify(coordinates);
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // 32bitに変換
+        }
+        return Math.abs(hash) / 2147483647; // 0-1の範囲に正規化
+    };
+    
+    // 座標から基本値を生成
+    const baseValue = getHashValue(aoiGeoJSON.coordinates);
+    
+    // 各指標の乱数生成関数
+    const randomizeIndex = (base, min, max) => {
+        const range = max - min;
+        const deviation = (Math.random() * 0.4) - 0.2; // -0.2から0.2の範囲
+        let value = base + deviation;
+        
+        // 範囲内に収める
+        value = Math.max(min, Math.min(max, value));
+        return value;
+    };
+    
+    // NDVI値の生成（0.3-0.7の範囲）
+    const ndviBase = randomizeIndex(baseValue, 0.3, 0.7);
+    
+    // NDMI値の生成（0.05-0.4の範囲）
+    const ndmiBase = randomizeIndex(baseValue * 0.5, 0.05, 0.4);
+    
+    // NDRE値の生成（0.05-0.3の範囲）
+    const ndreBase = randomizeIndex(baseValue * 0.4, 0.05, 0.3);
+    
+    // 各指標のばらつき（標準偏差）
+    const ndviStdDev = Math.random() * 0.15 + 0.05;
+    const ndmiStdDev = Math.random() * 0.1 + 0.03;
+    const ndreStdDev = Math.random() * 0.08 + 0.02;
+    
+    // 各指標の最小・最大生成
+    const ndviMin = Math.max(0, ndviBase - ndviStdDev * 2);
+    const ndviMax = Math.min(1, ndviBase + ndviStdDev * 2);
+    
+    const ndmiMin = Math.max(-0.2, ndmiBase - ndmiStdDev * 2);
+    const ndmiMax = Math.min(0.6, ndmiBase + ndmiStdDev * 2);
+    
+    const ndreMin = Math.max(-0.1, ndreBase - ndreStdDev * 2);
+    const ndreMax = Math.min(0.5, ndreBase + ndreStdDev * 2);
+    
+    // 日付範囲のモックデータ
+    const today = new Date();
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - Math.floor(Math.random() * 10 + 5)); // 5-15日前
+    
+    // 統計データ整形
+    const stats = {
+        'NDVI_mean': ndviBase,
+        'NDVI_stdDev': ndviStdDev,
+        'NDVI_min': ndviMin,
+        'NDVI_max': ndviMax,
+        'NDMI_mean': ndmiBase,
+        'NDMI_stdDev': ndmiStdDev,
+        'NDMI_min': ndmiMin,
+        'NDMI_max': ndmiMax,
+        'NDRE_mean': ndreBase,
+        'NDRE_stdDev': ndreStdDev,
+        'NDRE_min': ndreMin,
+        'NDRE_max': ndreMax
+    };
+    
+    // モックタイルURL（実際にはGEEから生成されるURLを模倣）
+    const mockMapId = Math.random().toString(36).substring(2, 10);
+    const ndviTileUrl = `https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/${mockMapId}_ndvi/tiles/{z}/{x}/{y}`;
+    const ndmiTileUrl = `https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/${mockMapId}_ndmi/tiles/{z}/{x}/{y}`;
+    const ndreTileUrl = `https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/${mockMapId}_ndre/tiles/{z}/{x}/{y}`;
+    
+    const result = {
+        dateRange: {
+            start: startDate.toISOString().split('T')[0],
+            end: today.toISOString().split('T')[0]
+        },
+        stats: stats,
+        ndviTileUrlTemplate: ndviTileUrl,
+        ndmiTileUrlTemplate: ndmiTileUrl,
+        ndreTileUrlTemplate: ndreTileUrl,
+        dataSource: 'local_mock_data'
+    };
+    
+    console.log('[DEMO MODE] ローカルモックデータ生成完了:', result);
+    return result;
 }
 
 // GEEからの統計データを整形する関数

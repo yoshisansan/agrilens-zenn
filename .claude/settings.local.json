@@ -1,14 +1,15 @@
 {
   "permissions": {
-    "defaultMode": "acceptEdit",
     "allow": [
-      "Bash(mkdir:*)",
-      "Bash(find:*)",
-      "Bash(ls:*)",
-      "Bash(npm audit:*)",
-      "Bash(npm test)",
-      "Bash(rg:*)",
-      "Bash(chmod:*)"
+      "Bash(npm install:*)",
+      "Bash(npm test:*)",
+      "Bash(npx jest:*)",
+      "Bash(node server-new.js)",
+      "Bash(kill:*)",
+      "Bash(npm start)",
+      "Bash(curl:*)",
+      "Bash(grep:*)",
+      "Bash(pkill:*)"
     ],
     "deny": []
   }

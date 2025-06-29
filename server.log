@@ -1,0 +1,148 @@
+2025-06-29 12:07:50 [INFO] Vertex AI initialized successfully
+2025-06-29 12:07:51 [INFO] Initializing Earth Engine with environment variables
+2025-06-29 12:07:51 [INFO] Starting AgriLens server {
+  "nodeVersion": "v20.18.1",
+  "environment": "development",
+  "pid": 63976
+}
+2025-06-29 12:07:51 [INFO] Middleware setup completed
+2025-06-29 12:07:51 [INFO] Routes setup completed
+2025-06-29 12:07:51 [INFO] Error handling setup completed
+2025-06-29 12:07:51 [INFO] Server started successfully {
+  "port": 3000,
+  "environment": "development",
+  "nodeVersion": "v20.18.1"
+}
+2025-06-29 12:07:51 [INFO] AgriLens server ready {
+  "server": {
+    "url": "http://localhost:3000",
+    "environment": "development",
+    "version": "1.0.0"
+  },
+  "api": {
+    "base": "/api",
+    "endpoints": {
+      "health": "/api/health",
+      "ai": "/api/ai",
+      "analysis": "/api/analysis",
+      "auth": "/api/auth"
+    }
+  },
+  "features": {
+    "security": {
+      "rateLimit": true,
+      "validation": true,
+      "authentication": true,
+      "logging": true
+    },
+    "services": {
+      "aiService": "available",
+      "earthEngine": "available",
+      "mockData": "fallback"
+    }
+  }
+}
+
+🌱 AgriLens Server Started
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 URL: http://localhost:3000
+🔧 Environment: development
+📊 API: http://localhost:3000/api
+🏥 Health: http://localhost:3000/api/health
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            
+2025-06-29 12:07:51 [INFO] AgriLens server startup completed {
+  "port": 3000,
+  "host": "localhost",
+  "pid": 63976,
+  "uptime": 0.77934375
+}
+2025-06-29 12:07:51 [INFO] Earth Engine authentication successful
+2025-06-29 12:07:52 [INFO] Earth Engine initialization successful
+2025-06-29 12:07:53 [INFO] Earth Engine connection test successful {
+  "testResult": {
+    "type": "Point",
+    "coordinates": {
+      "0": 0,
+      "1": 0
+    }
+  }
+}
+2025-06-29 12:07:55 [INFO] Request completed {
+  "method": "GET",
+  "url": "/api/server-info",
+  "statusCode": 200,
+  "responseTime": 2,
+  "ip": "::1",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+  "contentLength": 341,
+  "authenticated": false,
+  "username": "anonymous",
+  "sessionId": "h05OVWIPXXkGIOzdI8w9rjmcmldZF-q8",
+  "rateLimit": {
+    "ip": "::1",
+    "remaining": 99,
+    "total": 0,
+    "resetTime": {},
+    "used": -99
+  }
+}
+2025-06-29 12:07:55 [INFO] Request completed {
+  "method": "GET",
+  "url": "/api/auth-status",
+  "statusCode": 200,
+  "responseTime": 2,
+  "ip": "::1",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+  "contentLength": 144,
+  "authenticated": false,
+  "username": "anonymous",
+  "sessionId": "d-v6TzX84P9pIKweMnfip9BwbEemNjp1",
+  "rateLimit": {
+    "ip": "::1",
+    "remaining": 98,
+    "total": 0,
+    "resetTime": {},
+    "used": -98
+  }
+}
+2025-06-29 12:07:59 [INFO] Request completed {
+  "method": "GET",
+  "url": "/api/server-info",
+  "statusCode": 200,
+  "responseTime": 0,
+  "ip": "::1",
+  "userAgent": "curl/8.7.1",
+  "contentLength": 341,
+  "authenticated": false,
+  "username": "anonymous",
+  "sessionId": "pE2nT9GqO44A9sor9CPNdQNPtLUTufhE",
+  "rateLimit": {
+    "ip": "::1",
+    "remaining": 97,
+    "total": 0,
+    "resetTime": {},
+    "used": -97
+  }
+}
+2025-06-29 12:08:05 [INFO] Request completed {
+  "method": "GET",
+  "url": "/api/auth-status",
+  "statusCode": 200,
+  "responseTime": 1,
+  "ip": "::1",
+  "userAgent": "curl/8.7.1",
+  "contentLength": 144,
+  "authenticated": false,
+  "username": "anonymous",
+  "sessionId": "8jIyaTIdqkimF7w35qshaVRL52xXob07",
+  "rateLimit": {
+    "ip": "::1",
+    "remaining": 96,
+    "total": 0,
+    "resetTime": {},
+    "used": -96
+  }
+}
+2025-06-29 12:08:23 [INFO] Received SIGTERM, starting graceful shutdown
+2025-06-29 12:08:23 [INFO] Server closed successfully

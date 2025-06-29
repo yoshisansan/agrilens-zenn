@@ -2,6 +2,7 @@ module.exports = {
   testEnvironment: 'node',
   testMatch: [
     '**/test/**/*.test.js',
+    '**/tests/**/*.test.js',
     '**/__tests__/**/*.js'
   ],
   collectCoverageFrom: [

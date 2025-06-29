@@ -517,6 +517,9 @@ function showDashboardUserMessage(message) {
     const chatMessages = document.getElementById('dashboardChatMessages');
     if (!chatMessages) return;
     
+    // チャットメッセージコンテナを表示
+    chatMessages.classList.remove('hidden');
+    
     const messageElement = document.createElement('div');
     messageElement.className = 'chat-message user-message';
     messageElement.innerHTML = `
@@ -542,6 +545,9 @@ function showDashboardUserMessage(message) {
 async function showDashboardAiMessage(message, isRealAI = false) {
     const chatMessages = document.getElementById('dashboardChatMessages');
     if (!chatMessages) return;
+    
+    // チャットメッセージコンテナを表示
+    chatMessages.classList.remove('hidden');
     
     // メッセージをクリーンアップして整形
     const formattedMessage = formatMessageText(message);
@@ -572,14 +578,14 @@ async function showDashboardAiMessage(message, isRealAI = false) {
     
     chatMessages.appendChild(messageElement);
     
-    console.log('=== DEBUG: showDashboardAiMessage - おすすめ質問生成呼び出し ===');
-    console.log('message長さ:', message?.length);
-    
-    // おすすめ質問コンポーネントを生成して追加
-    try {
-        await generateAndShowDashboardSuggestedQuestions(message);
-    } catch (error) {
-        console.error('おすすめ質問生成でエラー:', error);
+    // 移行前のシンプルなデザインに合わせて、おすすめ質問は最初の回答にのみ表示
+    if (chatMessages.children.length <= 2) { // ユーザーメッセージ + AI回答の場合のみ
+        console.log('=== DEBUG: showDashboardAiMessage - おすすめ質問生成呼び出し ===');
+        try {
+            await generateAndShowDashboardSuggestedQuestions(message);
+        } catch (error) {
+            console.error('おすすめ質問生成でエラー:', error);
+        }
     }
     
     // スクロールを一番下に
@@ -932,22 +938,53 @@ function showDashboardSuggestedQuestionsComponent(questions) {
     suggestedQuestionsElement.className = 'suggested-questions-container';
     
     try {
+        // インラインスタイルで確実にスタイリングを適用
         suggestedQuestionsElement.innerHTML = `
-            <div class="suggested-questions-header">
-                <i class="fas fa-lightbulb text-yellow-500"></i>
-                <span class="suggested-questions-title">次のおすすめ質問</span>
+            <div class="suggested-questions-header" style="display: flex; align-items: center; margin-bottom: 8px;">
+                <i class="fas fa-lightbulb" style="color: #f59e0b; margin-right: 6px;"></i>
+                <span class="suggested-questions-title" style="font-size: 0.85rem; font-weight: 600; color: #92400e;">次のおすすめ質問</span>
             </div>
-            <div class="suggested-questions-buttons">
+            <div class="suggested-questions-buttons" style="display: flex; flex-direction: column; gap: 6px;">
                 ${questions.map((question, index) => `
                     <button 
                         class="suggested-question-btn" 
                         onclick="handleDashboardSuggestedQuestionClick('${escapeHtml(question)}')"
                         data-question="${escapeHtml(question)}"
+                        style="
+                            background-color: #ffffff;
+                            border: none;
+                            border-radius: 6px;
+                            padding: 8px 12px;
+                            text-align: left;
+                            font-size: 0.8rem;
+                            color: #374151;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                            line-height: 1.4;
+                            display: block;
+                            width: 100%;
+                            margin: 0;
+                            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                        "
+                        onmouseover="this.style.backgroundColor='#f3f4f6'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 2px 6px rgba(0, 0, 0, 0.15)';"
+                        onmouseout="this.style.backgroundColor='#ffffff'; this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 3px rgba(0, 0, 0, 0.1)';"
                     >
                         ${escapeHtml(question)}
                     </button>
                 `).join('')}
             </div>
+        `;
+        
+        // コンテナ自体にもインラインスタイルを適用
+        suggestedQuestionsElement.style.cssText = `
+            margin: 10px 0;
+            padding: 12px;
+            background-color: #fef7e6;
+            border: 1px solid #fbbf24;
+            border-radius: 8px;
+            display: block;
+            visibility: visible;
+            opacity: 1;
         `;
         
         console.log('HTML生成完了、要素をDOMに追加中...');
@@ -1027,6 +1064,8 @@ function clearDashboardChat() {
     const chatMessages = document.getElementById('dashboardChatMessages');
     if (chatMessages) {
         chatMessages.innerHTML = '';
+        // チャットコンテナを再び隠す
+        chatMessages.classList.add('hidden');
         // ウェルカムメッセージを再表示
         const welcomeMessage = document.createElement('div');
         welcomeMessage.className = 'chat-message ai-message';

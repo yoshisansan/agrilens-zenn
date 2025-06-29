@@ -15,6 +15,167 @@
     color: var(--sidebar-text);
 }
 
+/* サイドバー内の要素のはみ出し防止 */
+.sidebar input, 
+.sidebar textarea, 
+.sidebar select {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.sidebar .space-y-3 > div {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* 移行前のデザインに戻すためのボタンスタイル（おすすめ質問ボタンは除外） */
+button:not(.suggested-question-btn) {
+    border: 1px solid #d1d5db;
+    background-color: #ffffff;
+    color: #374151;
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    transition: all 0.2s ease;
+}
+
+button:not(.suggested-question-btn):hover {
+    background-color: #f9fafb;
+    border-color: #9ca3af;
+}
+
+/* 特定のカラークラスボタンは除外 */
+.bg-green-600, .bg-blue-600, .bg-red-500, .bg-yellow-500 {
+    border: none;
+}
+
+/* サイドバー内の小さなボタンの特別スタイル */
+.field-view-btn, .field-analyze-btn, .field-edit-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    border: 1px solid #d1d5db;
+    background-color: #f3f4f6;
+    color: #374151;
+    transition: all 0.2s ease;
+}
+
+.field-view-btn:hover, .field-analyze-btn:hover, .field-edit-btn:hover {
+    background-color: #e5e7eb;
+    border-color: #9ca3af;
+}
+
+/* チェックボックスの位置修正 */
+.field-select-checkbox {
+    margin-right: 0.5rem;
+    margin-left: 0;
+    align-self: flex-start;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+/* 区画アイテムのスタイル */
+.field-item {
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-left: 4px solid #d1d5db;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+    transition: all 0.2s ease;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.field-item:hover {
+    background-color: #f9fafb;
+    border-color: #9ca3af;
+    border-left-color: #6b7280;
+}
+
+.field-item.selected,
+.field-item.bg-blue-50 {
+    background-color: #eff6ff;
+    border-color: #93c5fd;
+    border-left-color: #3b82f6;
+}
+
+/* 区画名の見出しスタイル */
+.field-item h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+    line-height: 1.4;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+/* 圃場アイテム内のフレックス配置 */
+.field-item .flex.items-center {
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    overflow: hidden;
+}
+
+.field-item .flex-1 {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    word-wrap: break-word;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* 検索フィールドとフィルターの調整 */
+#fieldSearchInput {
+    padding-right: 40px;
+}
+
+#fieldSearchBtn {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: none;
+    background: none;
+    padding: 4px;
+    cursor: pointer;
+    color: #6b7280;
+}
+
+#fieldSearchBtn:hover {
+    color: #374151;
+}
+
+/* フィルターボタンの統一スタイル */
+#fieldSortSelect, #sortOrderBtn, #viewModeBtn {
+    font-size: 11px;
+    padding: 4px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    background-color: white;
+    color: #374151;
+    height: 28px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#fieldSortSelect:hover, #sortOrderBtn:hover, #viewModeBtn:hover {
+    background-color: #f9fafb;
+    border-color: #9ca3af;
+}
+
 @media (max-width: 768px) {
     .sidebar {
         position: absolute;

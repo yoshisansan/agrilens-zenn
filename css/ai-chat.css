@@ -193,51 +193,56 @@
 
 /* おすすめ質問コンポーネントのスタイル */
 .suggested-questions-container {
-    margin: 10px 0;
-    padding: 12px;
-    background-color: #fef7e6;
-    border: 1px solid #fbbf24;
-    border-radius: 8px;
+    margin: 10px 0 !important;
+    padding: 12px !important;
+    background-color: #fef7e6 !important;
+    border: 1px solid #fbbf24 !important;
+    border-radius: 8px !important;
     animation: fadeIn 0.3s ease;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .suggested-questions-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: 8px;
+    display: flex !important;
+    align-items: center !important;
+    margin-bottom: 8px !important;
 }
 
 .suggested-questions-title {
-    margin-left: 6px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #92400e;
+    margin-left: 6px !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    color: #92400e !important;
 }
 
 .suggested-questions-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
 }
 
 .suggested-question-btn {
-    background-color: #ffffff;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    padding: 8px 12px;
-    text-align: left;
-    font-size: 0.8rem;
-    color: #374151;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    line-height: 1.4;
+    background-color: #ffffff !important;
+    border: none !important;
+    border-radius: 6px !important;
+    padding: 8px 12px !important;
+    text-align: left !important;
+    font-size: 0.8rem !important;
+    color: #374151 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    line-height: 1.4 !important;
+    display: block !important;
+    width: 100% !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
 }
 
 .suggested-question-btn:hover {
-    background-color: #f3f4f6;
-    border-color: #9ca3af;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background-color: #f3f4f6 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
 }
 
 .suggested-question-btn:active {
