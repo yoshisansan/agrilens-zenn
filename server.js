@@ -6,6 +6,7 @@ const path = require('path');
 const cors = require('cors');
 const ee = require('@google/earthengine');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -24,6 +25,53 @@ app.use(session({
     resave: false,
     saveUninitialized: false
 }));
+
+// レート制限ミドルウェアの設定
+const createRateLimit = (windowMs, max, message) => {
+    return rateLimit({
+        windowMs,
+        max,
+        message: {
+            error: 'レート制限に達しました',
+            message,
+            retryAfter: Math.ceil(windowMs / 1000)
+        },
+        standardHeaders: true,
+        legacyHeaders: false,
+        // IPアドレスベースでレート制限
+        keyGenerator: (req) => {
+            return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 
+                   (req.connection.socket ? req.connection.socket.remoteAddress : '0.0.0.0');
+        },
+        handler: (req, res) => {
+            console.log(`レート制限に達しました - IP: ${req.ip}, エンドポイント: ${req.path}`);
+            res.status(429).json({
+                error: 'レート制限に達しました',
+                message: '1分間に3回までのリクエストに制限されています。しばらく待ってから再度お試しください。',
+                retryAfter: Math.ceil(windowMs / 1000)
+            });
+        }
+    });
+};
+
+// 各APIカテゴリ用のレート制限（3req/min per IP）
+const aiApiRateLimit = createRateLimit(
+    60 * 1000, // 1分
+    3, // 3リクエスト
+    'AI APIは1分間に3回までのリクエストに制限されています。'
+);
+
+const analysisApiRateLimit = createRateLimit(
+    60 * 1000, // 1分
+    3, // 3リクエスト
+    '分析APIは1分間に3回までのリクエストに制限されています。'
+);
+
+const authApiRateLimit = createRateLimit(
+    60 * 1000, // 1分
+    3, // 3リクエスト
+    '認証APIは1分間に3回までのリクエストに制限されています。'
+);
 
 // OAuth2クライアントの設定
 const oauth2Client = new OAuth2Client(
@@ -219,14 +267,14 @@ try {
 }
 
 // 認証ルート
-app.get('/auth', (req, res) => {
+app.get('/auth', authApiRateLimit, (req, res) => {
     // モックデータを使用するため、簡易的な認証処理
     req.session.authenticated = true;
     res.redirect('/');
 });
 
 // コールバックルート - 認証後に呼び出されるURL
-app.get('/auth/callback', async (req, res) => {
+app.get('/auth/callback', authApiRateLimit, async (req, res) => {
     const { code } = req.query;
     console.log('認証コールバック受信:', req.url);
     
@@ -236,7 +284,7 @@ app.get('/auth/callback', async (req, res) => {
 });
 
 // GEE分析API - 実際のGEEアクセス
-app.post('/api/analyze', async (req, res) => {
+app.post('/api/analyze', analysisApiRateLimit, async (req, res) => {
     try {
         console.log('分析リクエスト受信');
         
@@ -538,7 +586,7 @@ function generateMockNDVIData(aoiGeoJSON) {
 }
 
 // 認証ステータスチェック
-app.get('/api/auth-status', (req, res) => {
+app.get('/api/auth-status', authApiRateLimit, (req, res) => {
     res.json({ authenticated: true });  // モックデータを使用するため常に認証済みとして扱う
 });
 
@@ -569,7 +617,7 @@ try {
 }
 
 // 統合されたAI APIエンドポイント
-app.post('/api/ai-advice', async (req, res) => {
+app.post('/api/ai-advice', aiApiRateLimit, async (req, res) => {
   const fetch = await import('node-fetch').then(module => module.default);
   
   try {
@@ -742,7 +790,7 @@ async function handleDirectGeminiRequest(prompt, modelName, fetch) {
 }
 
 // Gemini APIへのリクエストを処理するエンドポイント（後方互換性のため残す）
-app.post('/api/gemini-advice', async (req, res) => {
+app.post('/api/gemini-advice', aiApiRateLimit, async (req, res) => {
   const fetch = await import('node-fetch').then(module => module.default);
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -830,7 +878,7 @@ app.post('/api/gemini-advice', async (req, res) => {
 });
 
 // Gemini API接続テスト用エンドポイント
-app.get('/api/gemini-test', async (req, res) => {
+app.get('/api/gemini-test', aiApiRateLimit, async (req, res) => {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -895,7 +943,7 @@ app.get('/api/gemini-test', async (req, res) => {
 });
 
 // クライアントにサーバー環境の基本情報を提供（APIキーは含まない）
-app.get('/api/server-info', (req, res) => {
+app.get('/api/server-info', aiApiRateLimit, (req, res) => {
   res.json({
     hasGeminiKey: !!process.env.GEMINI_API_KEY,
     serverMode: process.env.NODE_ENV || 'development',
