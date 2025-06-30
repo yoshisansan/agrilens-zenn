@@ -403,6 +403,9 @@ async function makeGeminiApiRequest(prompt, modelName = null) {
     const aiConfig = getAiConfig();
     const selectedModel = modelName || aiConfig.defaultModel;
     
+    console.log(`クライアント側 AI APIリクエスト - Provider: ${aiConfig.provider}, Model: ${selectedModel}`);
+    console.log(`プロンプト長: ${prompt.length} 文字`);
+    
     const fetchPromise = fetch('/api/ai-advice', {
         method: 'POST',
         headers: {
@@ -696,8 +699,24 @@ IMPORTANT: あなたは必ず以下のJSON形式で回答してください。�
 JSON以外のテキストや説明は一切含めず、上記のJSON形式のみで回答してください。`;
 
         console.log('おすすめ質問生成用プロンプト送信中（Gemma3使用）...');
+        console.log('📋 おすすめ質問生成 - 使用モデル: gemma-2-27b-it');
+        console.log('📋 プロンプト長:', enhancedPrompt.length, '文字');
+        
         // おすすめ質問生成にはGemma3モデル（gemma-2-27b-it）を明示的に指定
-        const responseText = await makeGeminiApiRequest(enhancedPrompt, 'gemma-2-27b-it');
+        const response = await makeGeminiApiRequest(enhancedPrompt, 'gemma-2-27b-it');
+        const responseData = await response.json();
+        
+        console.log('📋 おすすめ質問生成レスポンス受信');
+        console.log('📋 レスポンス成功:', responseData.success);
+        
+        let responseText = '';
+        if (responseData.success && responseData.result) {
+            responseText = responseData.result;
+            console.log('📋 Gemmaからの生レスポンス長:', responseText.length, '文字');
+        } else {
+            console.error('📋 おすすめ質問生成エラー:', responseData.error || 'Unknown error');
+            throw new Error(responseData.error || 'Invalid server response');
+        }
         
         if (responseText && typeof responseText === 'string') {
             // JSON レスポンスを解析
