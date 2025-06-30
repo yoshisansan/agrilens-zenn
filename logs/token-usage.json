@@ -1,0 +1,11 @@
+{
+  "date": "2025-06-29",
+  "gemini": {
+    "tokens": 0,
+    "requests": 0
+  },
+  "gemma": {
+    "tokens": 0,
+    "requests": 0
+  }
+}

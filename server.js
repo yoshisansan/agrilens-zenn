@@ -6,9 +6,14 @@ const path = require('path');
 const cors = require('cors');
 const ee = require('@google/earthengine');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
+const TokenLimiter = require('./js/modules/token-limiter');
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+// トークン使用量制限管理のインスタンス作成
+const tokenLimiter = new TokenLimiter();
 
 // ミドルウェアの設定
 app.use(cors({
@@ -24,6 +29,53 @@ app.use(session({
     resave: false,
     saveUninitialized: false
 }));
+
+// レート制限ミドルウェアの設定
+const createRateLimit = (windowMs, max, message) => {
+    return rateLimit({
+        windowMs,
+        max,
+        message: {
+            error: 'レート制限に達しました',
+            message,
+            retryAfter: Math.ceil(windowMs / 1000)
+        },
+        standardHeaders: true,
+        legacyHeaders: false,
+        // IPアドレスベースでレート制限
+        keyGenerator: (req) => {
+            return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 
+                   (req.connection.socket ? req.connection.socket.remoteAddress : '0.0.0.0');
+        },
+        handler: (req, res) => {
+            console.log(`レート制限に達しました - IP: ${req.ip}, エンドポイント: ${req.path}`);
+            res.status(429).json({
+                error: 'レート制限に達しました',
+                message: '1分間に3回までのリクエストに制限されています。しばらく待ってから再度お試しください。',
+                retryAfter: Math.ceil(windowMs / 1000)
+            });
+        }
+    });
+};
+
+// 各APIカテゴリ用のレート制限（3req/min per IP）
+const aiApiRateLimit = createRateLimit(
+    60 * 1000, // 1分
+    3, // 3リクエスト
+    'AI APIは1分間に3回までのリクエストに制限されています。'
+);
+
+const analysisApiRateLimit = createRateLimit(
+    60 * 1000, // 1分
+    3, // 3リクエスト
+    '分析APIは1分間に3回までのリクエストに制限されています。'
+);
+
+const authApiRateLimit = createRateLimit(
+    60 * 1000, // 1分
+    3, // 3リクエスト
+    '認証APIは1分間に3回までのリクエストに制限されています。'
+);
 
 // OAuth2クライアントの設定
 const oauth2Client = new OAuth2Client(
@@ -219,14 +271,14 @@ try {
 }
 
 // 認証ルート
-app.get('/auth', (req, res) => {
+app.get('/auth', authApiRateLimit, (req, res) => {
     // モックデータを使用するため、簡易的な認証処理
     req.session.authenticated = true;
     res.redirect('/');
 });
 
 // コールバックルート - 認証後に呼び出されるURL
-app.get('/auth/callback', async (req, res) => {
+app.get('/auth/callback', authApiRateLimit, async (req, res) => {
     const { code } = req.query;
     console.log('認証コールバック受信:', req.url);
     
@@ -236,7 +288,7 @@ app.get('/auth/callback', async (req, res) => {
 });
 
 // GEE分析API - 実際のGEEアクセス
-app.post('/api/analyze', async (req, res) => {
+app.post('/api/analyze', analysisApiRateLimit, async (req, res) => {
     try {
         console.log('分析リクエスト受信');
         
@@ -538,7 +590,7 @@ function generateMockNDVIData(aoiGeoJSON) {
 }
 
 // 認証ステータスチェック
-app.get('/api/auth-status', (req, res) => {
+app.get('/api/auth-status', authApiRateLimit, (req, res) => {
     res.json({ authenticated: true });  // モックデータを使用するため常に認証済みとして扱う
 });
 
@@ -569,7 +621,7 @@ try {
 }
 
 // 統合されたAI APIエンドポイント
-app.post('/api/ai-advice', async (req, res) => {
+app.post('/api/ai-advice', aiApiRateLimit, async (req, res) => {
   const fetch = await import('node-fetch').then(module => module.default);
   
   try {
@@ -607,6 +659,16 @@ async function handleVertexAIRequest(prompt, modelName) {
   if (!GOOGLE_PRIVATE_KEY || !GOOGLE_CLIENT_EMAIL || !GOOGLE_PRIVATE_KEY_ID) {
     throw new Error('サービスアカウント情報（GOOGLE_PRIVATE_KEY, GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY_ID）が設定されていません');
   }
+
+  // リクエスト前にトークン使用量制限をチェック
+  const estimatedTokens = Math.max(prompt.length * 0.75, 1000); // 概算: 文字数 * 0.75 + 最小1000
+  const limitCheck = tokenLimiter.checkLimit(modelName, estimatedTokens);
+  
+  if (!limitCheck.allowed) {
+    throw new Error(`トークン使用量制限に達しています: ${limitCheck.message}`);
+  }
+  
+  console.log(`トークン制限チェック通過: ${modelName} - ${limitCheck.message}`);
 
   // サービスアカウントキーオブジェクトを構成
   const serviceAccountKey = {
@@ -665,6 +727,23 @@ async function handleGeminiVertexRequest(vertexAI, prompt, modelName) {
 
   const result = await model.generateContent(request);
   const response = await result.response;
+  
+  // トークン使用量を記録
+  if (response.usageMetadata) {
+    const { inputTokens, outputTokens } = tokenLimiter.extractTokensFromUsage({
+      promptTokenCount: response.usageMetadata.promptTokenCount,
+      candidatesTokenCount: response.usageMetadata.candidatesTokenCount
+    });
+    await tokenLimiter.recordUsage(modelName, inputTokens, outputTokens);
+  } else {
+    console.warn('Vertex AIからの使用量情報が取得できませんでした');
+    // フォールバック: 概算で記録
+    const estimatedInputTokens = Math.ceil(prompt.length * 0.75);
+    const responseText = response.candidates[0].content.parts[0].text;
+    const estimatedOutputTokens = Math.ceil(responseText.length * 0.75);
+    await tokenLimiter.recordUsage(modelName, estimatedInputTokens, estimatedOutputTokens);
+  }
+  
   return response.candidates[0].content.parts[0].text;
 }
 
@@ -685,6 +764,23 @@ async function handleGemmaRequest(vertexAI, prompt, modelName) {
   });
 
   const response = await result.response;
+  
+  // トークン使用量を記録
+  if (response.usageMetadata) {
+    const { inputTokens, outputTokens } = tokenLimiter.extractTokensFromUsage({
+      promptTokenCount: response.usageMetadata.promptTokenCount,
+      candidatesTokenCount: response.usageMetadata.candidatesTokenCount
+    });
+    await tokenLimiter.recordUsage(modelName, inputTokens, outputTokens);
+  } else {
+    console.warn('Vertex AIからの使用量情報が取得できませんでした');
+    // フォールバック: 概算で記録
+    const estimatedInputTokens = Math.ceil(prompt.length * 0.75);
+    const responseText = response.candidates[0].content.parts[0].text;
+    const estimatedOutputTokens = Math.ceil(responseText.length * 0.75);
+    await tokenLimiter.recordUsage(modelName, estimatedInputTokens, estimatedOutputTokens);
+  }
+  
   return response.candidates[0].content.parts[0].text;
 }
 
@@ -742,7 +838,7 @@ async function handleDirectGeminiRequest(prompt, modelName, fetch) {
 }
 
 // Gemini APIへのリクエストを処理するエンドポイント（後方互換性のため残す）
-app.post('/api/gemini-advice', async (req, res) => {
+app.post('/api/gemini-advice', aiApiRateLimit, async (req, res) => {
   const fetch = await import('node-fetch').then(module => module.default);
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -830,7 +926,7 @@ app.post('/api/gemini-advice', async (req, res) => {
 });
 
 // Gemini API接続テスト用エンドポイント
-app.get('/api/gemini-test', async (req, res) => {
+app.get('/api/gemini-test', aiApiRateLimit, async (req, res) => {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -895,7 +991,9 @@ app.get('/api/gemini-test', async (req, res) => {
 });
 
 // クライアントにサーバー環境の基本情報を提供（APIキーは含まない）
-app.get('/api/server-info', (req, res) => {
+app.get('/api/server-info', aiApiRateLimit, (req, res) => {
+  const usageStatus = tokenLimiter.getUsageStatus();
+  
   res.json({
     hasGeminiKey: !!process.env.GEMINI_API_KEY,
     serverMode: process.env.NODE_ENV || 'development',
@@ -904,6 +1002,27 @@ app.get('/api/server-info', (req, res) => {
       defaultModel: AI_MODEL,
       region: GOOGLE_CLOUD_REGION,
       hasVertexAI: !!(GOOGLE_PROJECT_ID && GOOGLE_PRIVATE_KEY && GOOGLE_CLIENT_EMAIL)
-    }
+    },
+    tokenUsage: usageStatus
   });
+});
+
+// トークン使用状況を詳細表示するAPIエンドポイント
+app.get('/api/token-usage', (req, res) => {
+  try {
+    const usageStatus = tokenLimiter.getUsageStatus();
+    res.json({
+      success: true,
+      data: usageStatus,
+      timestamp: new Date().toISOString(),
+      timezone: 'Asia/Tokyo'
+    });
+  } catch (error) {
+    console.error('トークン使用状況取得エラー:', error);
+    res.status(500).json({
+      success: false,
+      error: 'トークン使用状況の取得に失敗しました',
+      message: error.message
+    });
+  }
 }); 
