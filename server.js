@@ -169,7 +169,7 @@ function startServer() {
     try {
         server = app.listen(port, () => {
             console.log(`サーバーが起動しました: http://localhost:${port}`);
-            displayStatus();
+            // Earth Engine初期化完了まで待つため、ここではdisplayStatus()を呼ばない
         });
         
         // サーバーエラーハンドリング
@@ -181,7 +181,24 @@ function startServer() {
     }
 }
 
-// サーバーのステータス表示
+// サーバーのステータス表示（成功時）
+function displaySuccessStatus() {
+    console.log('Google Earth Engineに接続しています。実際の衛星データを使用します。');
+    console.log('環境設定:');
+    console.log(`- ポート: ${port}`);
+    console.log(`- Google Earth Engine: 有効`);
+}
+
+// サーバーのステータス表示（失敗時）
+function displayFailureStatus() {
+    console.log('注意: Google Earth Engineに接続できません。モックデータを使用します。');
+    console.log('Earth Engineを使用するには、.envファイルに正しい認証情報を設定してください。');
+    console.log('環境設定:');
+    console.log(`- ポート: ${port}`);
+    console.log(`- Google Earth Engine: 無効 (モック)`);
+}
+
+// サーバーのステータス表示（廃止予定）
 function displayStatus() {
     // Earth Engineの初期化状況によってメッセージを変更
     if (earthEngineInitialized) {
@@ -249,8 +266,8 @@ try {
             earthEngineInitialized = true; // ここでフラグを設定
             console.log('リアルタイムの衛星データが利用可能になりました');
             
-            // 初期化成功後に再度ステータスを表示
-            displayStatus();
+            // 初期化成功後にステータスを表示
+            displaySuccessStatus();
             
             // テスト用に簡単なGEE操作を実行
             try {
@@ -264,10 +281,12 @@ try {
         })
         .catch(err => {
             console.error('Earth Engineの初期化に失敗しました:', err);
-            console.log('モックデータモードで動作します');
+            // 初期化失敗時のみモックデータメッセージを表示
+            displayFailureStatus();
         });
 } catch (err) {
     console.error('Earth Engine初期化処理でエラーが発生しました:', err);
+    displayFailureStatus();
 }
 
 // 認証ルート

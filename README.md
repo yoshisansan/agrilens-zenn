@@ -49,14 +49,27 @@
    # .envファイルを作成
    cp .env.example .env
    
-   # 以下の変数を設定
-   GOOGLE_PROJECT_ID=your-project-id
-   GOOGLE_CLOUD_REGION=asia-northeast1
-   GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-   GOOGLE_CLIENT_EMAIL=your-service-account@your-project-id.iam.gserviceaccount.com
+   # 以下の変数を設定（.envファイル内で）
+   # Google OAuth (Optional)
+   GOOGLE_CLIENT_ID=your-google-client-id
+   GOOGLE_CLIENT_SECRET=your-google-client-secret
+   GOOGLE_REDIRECT_URI=your-redirect-uri
    GOOGLE_PRIVATE_KEY_ID=your-private-key-id
-   AI_API_PROVIDER=vertex
+   GOOGLE_CLOUD_REGION=asia-northeast1
+   
+   # API設定
+   AI_API_PROVIDER=vertex  # または gemini-direct
    AI_MODEL=gemini-2.0-flash-thinking-exp-01-21
+   
+   # フォールバック用（直接API）
+   GEMINI_API_KEY=your-gemini-api-key
+   
+   # Security
+   SESSION_SECRET=your-secure-session-secret
+   
+   # サーバー設定
+   PORT=3000
+   NODE_ENV=development
    ```
 
 5. **依存関係のインストール**
@@ -117,6 +130,128 @@ npm start
 npm test
 ```
 
+## Cloud Runへのデプロイ
+
+AgriLensはGoogle Cloud Runにデプロイして本番環境で運用できます。
+
+### 前提条件
+
+1. **Google Cloud CLIのインストール**
+   ```bash
+   curl https://sdk.cloud.google.com | bash
+   exec -l $SHELL
+   ```
+
+2. **Google Cloudへの認証**
+   ```bash
+   gcloud auth login
+   gcloud config set project YOUR_PROJECT_ID
+   ```
+
+3. **必要なAPIの有効化**
+   ```bash
+   gcloud services enable run.googleapis.com
+   gcloud services enable cloudbuild.googleapis.com
+   gcloud services enable earthengine.googleapis.com
+   gcloud services enable aiplatform.googleapis.com
+   ```
+
+### デプロイ手順
+
+1. **環境変数の設定**
+   
+   `.env`ファイルに本番環境用の設定を追加：
+   ```bash
+   # Google Cloud設定
+   GOOGLE_PROJECT_ID=your-project-id
+   GOOGLE_CLOUD_REGION=asia-northeast1
+   
+   # Earth Engine認証（環境変数方式推奨）
+   GOOGLE_CLIENT_EMAIL=your-service-account@your-project.iam.gserviceaccount.com
+   GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+   GOOGLE_PRIVATE_KEY_ID=your-private-key-id
+   
+   # Vertex AI設定
+   AI_API_PROVIDER=vertex
+   AI_MODEL=gemini-2.0-flash-thinking-exp-01-21
+   
+   # 本番環境URL
+   PRODUCTION_URL=https://your-service-name-xxx-an.a.run.app
+   
+   # セキュリティ
+   SESSION_SECRET=your-secure-random-session-secret
+   NODE_ENV=production
+   ```
+
+2. **デプロイスクリプトの実行**
+   ```bash
+   # デプロイスクリプトに実行権限を付与
+   chmod +x ./shell/deploy.sh
+   
+   # Cloud Runにデプロイ
+   ./shell/deploy.sh
+   ```
+
+3. **デプロイ完了後の確認**
+   
+   デプロイが成功すると、以下のような出力が表示されます：
+   ```
+   ✅ Deployment completed successfully!
+   🌐 Service URL: https://your-service-name-xxx-an.a.run.app
+   ```
+
+### デプロイスクリプトの機能
+
+`./shell/deploy.sh`スクリプトは以下を自動実行します：
+
+- 環境変数の読み込み
+- Google Cloudプロジェクトの設定
+- 課金状態の確認
+- 必要なAPIの有効化
+- Cloud Runへのデプロイ
+- サービスへの一般アクセス許可設定
+
+### トラブルシューティング
+
+**認証エラーが発生する場合：**
+```bash
+# サービスアカウントキーを再作成
+gcloud iam service-accounts keys create ./service-account-key.json \
+  --iam-account=your-service-account@your-project.iam.gserviceaccount.com
+
+# 環境変数を再設定
+```
+
+**デプロイが失敗する場合：**
+```bash
+# ログを確認
+gcloud run services describe agrilens --region=asia-northeast1
+gcloud logs read --service=agrilens --region=asia-northeast1
+```
+
+**メモリ不足エラーの場合：**
+```bash
+# メモリ制限を増やしてデプロイ
+gcloud run deploy agrilens \
+  --source . \
+  --region=asia-northeast1 \
+  --memory=1Gi \
+  --allow-unauthenticated
+```
+
+### 運用コマンド
+
+```bash
+# サービス状態確認
+gcloud run services list --region=asia-northeast1
+
+# ログ確認
+./shell/logs.sh
+
+# サービス更新（コード変更後）
+./shell/update.sh
+```
+
 ## ライセンス
 
-MIT License
+MIT License + The Commons Clause
